@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v 147b765839e1 2011/08/18 22:11:13 simonjwright $
+# $Id: nuweb.py,v 3baea15adb6e 2011/08/18 22:11:52 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -677,7 +677,7 @@ class CodeElement(DocumentElement):
                         elements.append(c)
                         break
             result.append([i[0], elements])
-        return result
+        return sorted(result)
 
     def uses_identifiers(self):
         """Returns a list of all the identifier definitions made by
@@ -858,7 +858,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 147b765839e1 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 3baea15adb6e $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
