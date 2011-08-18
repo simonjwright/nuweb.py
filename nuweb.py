@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v 2c050eacbf68 2011/08/18 22:07:44 simonjwright $
+# $Id: nuweb.py,v c6e81b5cfde3 2011/08/18 22:09:46 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -515,23 +515,32 @@ class CodeElement(DocumentElement):
         # Start with an impossible page number
         page = -1
         for e in elements:
-            if e.page_number != page and page != -1:
-                # Insert a ', ' separator for new pages after the
-                # first.
-                stream.write(", ")
+            try:
+                if e.page_number != page and page != -1:
+                    # Insert a ', ' separator for new pages after the
+                    # first.
+                    stream.write(", ")
+                new_page = e.page_number
+                new_scrap = e.scrap_on_page
+            except:
+                # Ths happens if the page and scrap data hasn't been
+                # set up (probably because there's no .aux file, but
+                # maybe because it's too short).
+                new_page = 1
+                new_scrap = 'a'
             # Write the link target.
             stream.write("\\NWlink{nuweb%s%s}"
-                         % (e.page_number, e.scrap_on_page))
-            if e.page_number != page:
+                         % (new_page, new_scrap))
+            if new_page != page:
                 # This is a new page, so include the page number in
                 # the link.
-                stream.write("{%s%s}" % (e.page_number, e.scrap_on_page))
+                stream.write("{%s%s}" % (new_page, new_scrap))
             else:
                 # This is a further element on the same page, so the
                 # link is just the scrap-on-page.
-                stream.write("{%s}" % e.scrap_on_page)
+                stream.write("{%s}" % new_scrap)
             # Update the page number.
-            page = e.page_number
+            page = new_page
 
     def __init__(self, name, text, identifiers, splittable):
         self.name = name
@@ -831,7 +840,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 2c050eacbf68 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: c6e81b5cfde3 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
