@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v c6e81b5cfde3 2011/08/18 22:09:46 simonjwright $
+# $Id: nuweb.py,v 390db7050b54 2011/08/18 22:10:32 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -292,7 +292,7 @@ class InvocatingCodeLine(CodeLine):
 
     def write_code(self, stream, indent, parameters):
         """Writes self to 'stream' as code, indented by 'indent'."""
-        stream.write(self.start)
+        stream.write("%s%s" % (indent, self.start))
         params = [CodeLine.substitute_parameters(p, parameters)
                   for p in self.parameters]
         # Note the indent needed for the fragments (where we are now;
@@ -301,7 +301,8 @@ class InvocatingCodeLine(CodeLine):
         new_indent = indent +  re.sub(r'\S', ' ', self.start).expandtabs()
         fragments = [d for d in document if d.matches(self.name)]
         # Fix up abbreviated names in the invocation.
-        # XXX Probably not a good plan to fix up stuff on the fly!
+        # XXX Fixing up stuff on the fly probably doesn't help the
+        # XXX reader's understanding!
         for f in fragments:
             if len(f.name) > len(self.name):
                 self.name = f.name
@@ -840,7 +841,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: c6e81b5cfde3 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 390db7050b54 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
