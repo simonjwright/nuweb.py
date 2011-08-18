@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v 0439be42772a 2011/08/18 22:02:36 simonjwright $
+# $Id: nuweb.py,v b1be54e8ff71 2011/08/18 22:03:20 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -372,6 +372,22 @@ class DocumentElement():
         output.write(self.text)
     def matches(self, definition):
         return False
+    def defined_by(self):
+        """Returns a list of other Fragments with the same name, ie
+        which taken together define the whole fragment."""
+        return []
+    def referenced_in(self):
+        """Returns a list of CodeElements which reference this
+        Fragment."""
+        return []
+    def defines(self):
+        """Returns a list of the variable definitions made by this
+        CodeElement and where they're used."""
+        return []
+    def uses(self):
+        """Returns a list of the variable definitions used by this
+        CodeElement (not including any it defines itself)."""
+        return []
 
 class Text(DocumentElement):
     """Contains LaTeX text from the original nuweb source file."""
@@ -382,10 +398,10 @@ class CodeElement(DocumentElement):
     """May be a File or a Fragment.
 
     'name' is either the file name or the definition name.  'text' is
-    the code content.  'defines' is a list of the identifiers defined
-    by the element.  'splittable' is True if the text is allowed to be
-    split over a page boundary in the printed document (otherwise a
-    minipage environment is used to prevent splitting)."""
+    the code content.  'definitions' is a list of the identifiers
+    defined by the element.  'splittable' is True if the text is
+    allowed to be split over a page boundary in the printed document
+    (otherwise a minipage environment is used to prevent splitting)."""
 
     # The scrap sequence number, used as the index (key) to
     # code_elements.
@@ -402,30 +418,57 @@ class CodeElement(DocumentElement):
                              + r'\s*'
                              + r'(?P<name>.*?)'
                              + r'@{(?P<text>.*?)'
-                             + r'(@\|(?P<defines>.*))?'
+                             + r'(@\|(?P<definitions>.*))?'
                              + r'@}')
         m = re.match(matcher, segment)
         try:
             kind = m.group('kind')
             name = m.group('name').strip()
             text = m.group('text')
-            if m.group('defines'):
-                defines = m.group('defines').split()
+            if m.group('definitions'):
+                definitions = m.group('definitions').split()
             else:
-                defines = []
+                definitions = []
         except:
             sys.stderr.write("failed CodeElement.factory(%s)\n" % segment)
             sys.exit(1)
         if kind == 'o':
-            return File(name, text, defines, False)
+            return File(name, text, definitions, False)
         elif kind == 'O':
-            return File(name, text, defines, True)
+            return File(name, text, definitions, True)
         elif kind == 'd':
-            return Fragment(name, text, defines, False)
+            return Fragment(name, text, definitions, False)
         elif kind == 'D':
-            return Fragment(name, text, defines, True)
+            return Fragment(name, text, definitions, True)
 
-    def __init__(self, name, text, defines, splittable):
+    @staticmethod
+    def write_elements(stream, elements):
+        """'elements' is a list of CodeElements whose page/scrap-on-page
+        references are to be written to 'stream'."""
+        # Start with an impossible page number
+        page = -1
+        for e in elements:
+            if e.page_number != page and page != -1:
+                # Insert a ', ' separator for new pages after the
+                # first.
+                stream.write(", ")
+            # Write the link target.
+            stream.write("\\NWlink{nuweb%s%s}"
+                         % (e.page_number, e.scrap_on_page))
+            if e.page_number != page:
+                # This is a new page, so include the page number in
+                # the link.
+                stream.write("{%s%s}" % (e.page_number, e.scrap_on_page))
+            else:
+                # This is a further element on the same page, so the
+                # link is just the scrap-on-page.
+                stream.write("{%s}" % e.scrap_on_page)
+            # Update the page number.
+            page = e.page_number
+        # Finish with a period.
+        stream.write(".")
+
+    def __init__(self, name, text, definitions, splittable):
         self.name = name
         # We want to split into lines, retaining the \n at the end of
         # all lines that have one already (which may not include the
@@ -444,7 +487,7 @@ class CodeElement(DocumentElement):
         if text[-1] == '\r':
             text = text[:-1]
         self.lines = [CodeLine.factory(l) for l in text.split("\r")]
-        self.defines = defines
+        self.definitions = definitions
         self.splittable = splittable
         self.scrap_number = CodeElement.scrap_number
         CodeElement.scrap_number = CodeElement.scrap_number + 1
@@ -472,25 +515,69 @@ class CodeElement(DocumentElement):
         output.write("\\mbox{}{\NWsep}\n")
         output.write("\\end{list}\n")
         output.write("\\vspace{-1ex}\n")
-        # XXX Cross-references go here.
+        defined_by = self.defined_by()
+        referenced_in = self.referenced_in()
+        defines = self.defines()
+        uses = self.uses()
+        if len(defined_by) > 1 \
+                or len(referenced_in) > 0 \
+                or len(defines) > 0 \
+                or len(uses) > 0:
+            # We only create this list environment for the
+            # crossreferences if there are any (otherwise, we'd have
+            # to create an empty \item)
+            output.write("\\vspace{-1ex}\n")
+            output.write("\\footnotesize\n")
+            output.write("\\begin{list}{}{")
+            output.write("\\setlength{\\itemsep}{-\\parsep}")
+            output.write("\\setlength{\\itemindent}{-\\leftmargin}")
+            output.write("}\n")
+
+            if len(defined_by) > 1:
+                output.write("\\item \NWtxtMacroDefBy\ ")
+                CodeElement.write_elements(output, defined_by)
+                output.write("\n")
+
+            if len(referenced_in) > 0:
+                output.write("\\item \NWtxtMacroRefIn\ ")
+                CodeElement.write_elements(output, referenced_in)
+                output.write("\n")
+
+            #sys.stderr.write("'%s' defined_by %d fragments.\n" % (self.name, len(defined_by)))
+
+            output.write("\\item{}\n")
+
+            output.write("\\end{list}\n")
         if not self.splittable:
             output.write("\\end{minipage}\n")
         output.write("\\end{flushleft}\n")
+
+    def XXXdefines(self):
+        """Returns a list of the variable definitions made by this
+        CodeElement."""
+        return self.definitions
 
 class File(CodeElement):
     """Forms part of a named file. The whole file is composed of all
     the File objects with the same name, concatenated in document
     order."""
-    def __init__(self, name, text, defines, splittable):
+
+    def __init__(self, name, text, definitions, splittable):
         """The 'name' consists of a filename (without spaces) and
         optional flags."""
         name_parts = name.split()
-        CodeElement.__init__(self, name_parts[0], text, defines, splittable)
+        CodeElement.__init__(self,
+                             name_parts[0],
+                             text,
+                             definitions,
+                             splittable)
         self.flags = name_parts[1:]
+
     def generate_code(self):
         if not self.name in files:
             files[self.name] = OutputCodeFile(self.name)
         self.write_code(files[self.name], '')
+
     def write_title(self, output):
         try:
             link = "%s%s" % (self.page_number, self.scrap_on_page)
@@ -503,6 +590,7 @@ class File(CodeElement):
 class Fragment(CodeElement):
     """Forms part of a definition. The whole definition is composed of
     all the Fragments with the same name, in document order."""
+
     def matches(self, invocation):
         if self.name == invocation:
             return True
@@ -516,6 +604,7 @@ class Fragment(CodeElement):
             return True
         else:
             return False
+
     def write_title(self, output):
         try:
             link = "%s%s" % (self.page_number, self.scrap_on_page)
@@ -524,6 +613,11 @@ class Fragment(CodeElement):
         output.write("\\NWtarget{nuweb%s}{}$\\langle\\,${\\it %s}"
                      "\\nobreak\\ {\\footnotesize{%s}}$\\,\\rangle\\equiv$\n"
                      % (link, self.name, link))
+
+    def defined_by(self):
+        """Returns a list of other Fragments with the same name, ie
+        which taken together define the whole fragment."""
+        return [d for d in document if d.matches(self.name)]
 
 
 #-----------------------------------------------------------------------
@@ -622,7 +716,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 0439be42772a $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: b1be54e8ff71 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
