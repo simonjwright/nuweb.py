@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v 50df114f5e58 2011/08/18 22:01:47 simonjwright $
+# $Id: nuweb.py,v 0439be42772a 2011/08/18 22:02:36 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -291,14 +291,17 @@ class InvocatingCodeLine(CodeLine):
         # characters in the self.start sequence).
         new_indent = indent +  re.sub(r'\S', ' ', self.start).expandtabs()
         fragments = [d for d in document if d.matches(self.name)]
-        fragments[0].write_code(stream, new_indent, params)
-        for f in fragments[1:]:
-            # For follow-on fragments, we have to output the new
-            # indentation at the beginning of the new line. NB, this
-            # assumes that if there is anything in self.end, there'll
-            # only be ome matching fragment.
-            stream.write(new_indent)
-            f.write_code(stream, new_indent, params)
+        if len(fragments) == 0:
+            sys.stderr.write("no fragments matching '%s'.\n" % self.name)
+        else:
+            fragments[0].write_code(stream, new_indent, params)
+            for f in fragments[1:]:
+                # For follow-on fragments, we have to output the new
+                # indentation at the beginning of the new line. NB,
+                # this assumes that if there is anything in self.end,
+                # there'll only be ome matching fragment.
+                stream.write(new_indent)
+                f.write_code(stream, new_indent, params)
         stream.write(self.end)
 
     def write_latex(self, stream):
@@ -619,7 +622,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 50df114f5e58 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 0439be42772a $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
