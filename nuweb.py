@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v bbbeb82d71f6 2011/08/18 22:04:06 simonjwright $
+# $Id: nuweb.py,v a22c4b14bc2a 2011/08/18 22:04:56 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -294,6 +294,11 @@ class InvocatingCodeLine(CodeLine):
         # characters in the self.start sequence).
         new_indent = indent +  re.sub(r'\S', ' ', self.start).expandtabs()
         fragments = [d for d in document if d.matches(self.name)]
+        # Fix up abbreviated names in the invocation.
+        # XXX Probably not a good plan to fix up stuff on the fly!
+        for f in fragments:
+            if len(f.name) > len(self.name):
+                self.name = f.name
         if len(fragments) == 0:
             sys.stderr.write("no fragments matching '%s'.\n" % self.name)
         else:
@@ -739,7 +744,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: bbbeb82d71f6 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: a22c4b14bc2a $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
