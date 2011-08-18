@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v b1be54e8ff71 2011/08/18 22:03:20 simonjwright $
+# $Id: nuweb.py,v bbbeb82d71f6 2011/08/18 22:04:06 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -243,6 +243,9 @@ class CodeLine():
         """Writes self to 'stream' as LaTeX. To be overridden."""
         pass
 
+    def invokes(self, name):
+        return False
+
 class LiteralCodeLine(CodeLine):
     """A line of code that contains text but no fragment invocations."""
 
@@ -356,6 +359,11 @@ class InvocatingCodeLine(CodeLine):
 
         # Output the line.
         stream.write("\\mbox{}\\verb@%s@\\\\\n" % line)
+
+    def invokes(self, name):
+        # XXX Need some 'matches' logic here (though perhaps we should
+        # expand all fragment names in an earlier pass???)
+        return name == self.name
 
 
 #-----------------------------------------------------------------------
@@ -552,6 +560,21 @@ class CodeElement(DocumentElement):
             output.write("\\end{minipage}\n")
         output.write("\\end{flushleft}\n")
 
+    def referenced_in(self):
+        """Returns a list of CodeElements which reference this
+        Fragment."""
+        def invokes_self(code_lines):
+            for l in code_lines:
+                if l.invokes(self.name):
+                    return True;
+            return False;
+        # A Fragment that's referenced but not defined has no code
+        # lines, so don't include it.
+        return [e for e in document
+                if isinstance(e, CodeElement) \
+                    and hasattr(e, 'lines') \
+                    and invokes_self(e.lines)]
+
     def XXXdefines(self):
         """Returns a list of the variable definitions made by this
         CodeElement."""
@@ -716,7 +739,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: b1be54e8ff71 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: bbbeb82d71f6 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
