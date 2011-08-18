@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v bb7489d7b86a 2011/08/18 22:06:19 simonjwright $
+# $Id: nuweb.py,v f38fdc493e6b 2011/08/18 22:06:55 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -532,8 +532,6 @@ class CodeElement(DocumentElement):
                 stream.write("{%s}" % e.scrap_on_page)
             # Update the page number.
             page = e.page_number
-        # Finish with a period.
-        stream.write(".")
 
     def __init__(self, name, text, identifiers, splittable):
         self.name = name
@@ -603,20 +601,30 @@ class CodeElement(DocumentElement):
             if len(defined_by) > 1:
                 output.write("\\item \\NWtxtMacroDefBy\\ ")
                 CodeElement.write_elements(output, defined_by)
-                output.write("\n")
+                output.write(".\n")
 
             if isinstance(self, Fragment):
                 referenced_in = self.referenced_in()
                 if len(referenced_in) > 0:
                     output.write("\\item \\NWtxtMacroRefIn\\ ")
                     CodeElement.write_elements(output, referenced_in)
-                    output.write("\n")
+                    output.write(".\n")
                 else:
                     output.write("\\item \\NWtxtMacroNoRef.\n")
                 used_identifiers = self.used_identifiers()
                 if len(used_identifiers) > 0:
-                    print(used_identifiers)
-                    output.write("\\item{Identifiers used!}\n")
+                    def write_id_and_uses(i):
+                        output.write("\\verb@%s@\\ " % i[0])
+                        if len(i[1]) > 0:
+                            CodeElement.write_elements(output, i[1])
+                        else:
+                            output.write("\\NWtxtIdentsNotUsed")
+                    output.write("\\item \\NWtxtIdentsDefed\\ ")
+                    for i in used_identifiers[:-1]:
+                        write_id_and_uses(i)
+                        output.write(", ")
+                    write_id_and_uses(used_identifiers[-1])
+                    output.write(".\\\\\n")
 
             if len(uses_identifiers) > 0:
                 # XXX
@@ -644,7 +652,7 @@ class CodeElement(DocumentElement):
 
     def used_identifiers(self):
         """Returns a list of the identifier definitions made by this
-        CodeElement and their users: [[identifier, [element]]]."""
+        CodeElement and their users: [[identifier-text, [element]]]."""
         code = [c for c in document
                 if isinstance(c, CodeElement) and c != self]
         result = []
@@ -655,14 +663,13 @@ class CodeElement(DocumentElement):
                     if l.matches_identifier(i[1]):
                         elements.append(c)
                         break
-            if len(elements) > 0:
-                result.append([i[0], elements])
+            result.append([i[0], elements])
         return result
 
     def uses_identifiers(self):
         """Returns a list of all the identifier definitions made by
         other CodeElements and used in this one:
-        [[element, [identifier]]]."""
+        [[element, [identifier-text]]]."""
         code = [c for c in document
                 if isinstance(c, CodeElement) and c != self]
         return []
@@ -826,7 +833,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: bb7489d7b86a $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: f38fdc493e6b $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
@@ -921,7 +928,7 @@ def main():
     define_macro (doc, "NWtxtNoRef", "Not referenced")
     define_macro (doc, "NWtxtFileDefBy", "File defined by")
     define_macro (doc, "NWtxtIdentsUsed", "Uses:")
-    define_macro (doc, "NWtxtIdentsNotUsed", "Never used")
+    define_macro (doc, "NWtxtIdentsNotUsed", "never used")
     define_macro (doc, "NWtxtIdentsDefed", "Defines:")
     define_macro (doc, "NWsep", "${\\diamond}$")
     define_macro (doc, "NWnotglobal", "(not defined globally)")
