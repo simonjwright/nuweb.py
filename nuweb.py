@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v 9583e6f87a23 2011/08/18 21:56:50 simonjwright $
+# $Id: nuweb.py,v a24c7c063aa3 2011/08/18 21:57:51 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -298,14 +298,45 @@ class CodeElement(DocumentElement):
         output.write("\\end{flushleft}\n")
 
     def write_latex_line(self, output, line):
-        # The standard substitutions
-        subs = [["@<", "@$\\langle\\,$\\verb@"],
-                ["@>", "@$\\rangle\\,$\\verb@"],
-                ["@(", "("],
-                ["@'", "'"],
-                ["@,", ","],
-                ["@)", ")"]]
-        # Does this line invoke a fragment?
+        """The whole 'line' is written to 'output' as verbatim LaTeX text."""
+
+        # The \verb delimiter is @, which means we need extra care
+        # when the text to be output itself contains an @, or if we
+        # want to inset LaTeX.
+
+        def substitute_at_symbols(str):
+            """Performs the @ substitutions."""
+
+            # Remove double-at, so that the @@ in a substring like "@@,"
+            # doesn't remain live and cause the substring to get treated
+            # as "@,".
+            # Split at '@@' (later, we'll rejoin with '@').
+            ss = str.split("@@")
+
+            # Un-escape @( etc. Parameters like '@1' must appear as
+            # themselves, which is slightly awkward because the LaTeX
+            # output is embedded in \verb@...@. Any @ we want to appear in
+            # the output is inserted by terminating the current \verb@
+            # environment, including a \verb|@|, and restarting the verb@
+            # environment.
+            def subs(st):
+                for s in [["@(", "("], ["@'", "'"], ["@,", ","], ["@)", ")"]]:
+                    st = st.replace(s[0], s[1])
+                return st
+            ss = [re.sub(r'@([1-9])',
+                         r'@\\verb|@|\\verb@\1',
+                         subs(s))
+                  for s in ss]
+
+            # Rejoin the string with a verbatim @.
+            str = r'@\verb|@|\verb@'.join(ss)
+
+            return str
+
+        # Does this line invoke a fragment? If so, we need to
+        # determine what is invoked and include a link to the
+        # declaration (or the first and an ellipsis, if more than
+        # one). Otherwise, we can just substitute at-symbols.
         m = re.match(CodeElement.invocation_matcher, line)
         if m:
             # We need to find all the fragments which match this
@@ -334,37 +365,27 @@ class CodeElement(DocumentElement):
             if len(elements) > 0:
                 e = elements[0]
                 try:
-                    link = "%s%s" % (e.page_number, e.scrap_on_page)
+                    link = '%s%s' % (e.page_number, e.scrap_on_page)
                 except:
-                    link = "??"
+                    link = '??'
                 link = r'{\footnotesize \NWlink{nuweb%s}{%s}}' % (link, link)
                 if len(elements) > 1:
                     link = link + ', ...'
-                # Reconstitute the original line, ready for
-                # substitution and output.
-                line = m.group('start') \
-                    + '@<' \
-                    + m.group('invocation') \
+                # Reconstitute the line, making substitutions.
+                line = substitute_at_symbols(m.group('start')) \
+                    + r'@$\langle\,$\verb@' \
+                    + substitute_at_symbols(m.group('invocation')) \
+                    + '@' \
                     + link \
-                    + ' @>' \
-                    + m.group('end')
+                    + r'\,$\rangle\,$\verb@' \
+                    + substitute_at_symbols(m.group('end'))
 
-        # Remove double-at, so that the @@ in a substring like "@@,"
-        # doesn't remain live and cause the substring to get treated
-        # as "@,".
-        li = line.split("@@")
-        r = []
-        for l in li:
-            # Perform the standard substitutions of '@' followd by a
-            # character.
-            for s in subs:
-                l = l.replace(s[0], s[1])
-            # Parameters like "@1" must appear as themselves.
-            r.append(re.sub(r'@([1-9])', r'@\\verb|@|\\verb@\1', l))
-        # Finally, reinsert any "@@"s from the original line as just
-        # "@", and output.
-        output.write\
-            ("\\mbox{}\\verb@%s@\\\\\n" % "@\\verb|@|\\verb@".join(r))
+        else:
+            # No invocation on this line.
+            line = substitute_at_symbols(line)
+
+        # Output the line.
+        output.write("\\mbox{}\\verb@%s@\\\\\n" % line)
 
 class File(CodeElement):
     """Forms part of a named file. The whole file is composed of all
@@ -544,7 +565,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 9583e6f87a23 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: a24c7c063aa3 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
