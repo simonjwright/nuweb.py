@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v a24c7c063aa3 2011/08/18 21:57:51 simonjwright $
+# $Id: nuweb.py,v 0e69d73746a4 2011/08/18 21:58:37 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -356,10 +356,17 @@ class CodeElement(DocumentElement):
             # Assumption: only one invocation on a line!
 
             name = m.group('invocation').strip()
-            # Check whether the invocation includes parameters.
+            parameters = ''
+            # Check whether the invocation includes parameters, and
+            # form the LaTeX text accordingly.
             n = re.match(CodeElement.parameter_matcher, name)
             if n:
                 name = n.group('name').strip()
+                parameters = \
+                    substitute_at_symbols(n.group('parameters').strip())
+                text = r'{\it %s}\ (\verb@%s@)' % (name, parameters)
+            else:
+                text = r'{\it %s}' % name
             # Find all the elements with that name
             elements = [e for e in document if e.matches(name)]
             if len(elements) > 0:
@@ -373,9 +380,9 @@ class CodeElement(DocumentElement):
                     link = link + ', ...'
                 # Reconstitute the line, making substitutions.
                 line = substitute_at_symbols(m.group('start')) \
-                    + r'@$\langle\,$\verb@' \
-                    + substitute_at_symbols(m.group('invocation')) \
-                    + '@' \
+                    + r'@$\langle\,$' \
+                    + text \
+                    + r'\ ' \
                     + link \
                     + r'\,$\rangle\,$\verb@' \
                     + substitute_at_symbols(m.group('end'))
@@ -565,7 +572,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: a24c7c063aa3 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 0e69d73746a4 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
