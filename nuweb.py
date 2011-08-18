@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v 6333e1851729 2011/08/18 22:00:33 simonjwright $
+# $Id: nuweb.py,v 4dbcf31ca5ff 2011/08/18 22:01:07 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -125,7 +125,7 @@ class OutputCodeFile:
             current_content = outfile.readlines()
             outfile.close()
             if new_content == current_content:
-                sys.stderr.write("output file %s unchanged.\n" % self.path)
+                #sys.stderr.write("output file %s unchanged.\n" % self.path)
                 return
             else:
                 sys.stderr.write("output file %s has changed.\n" % self.path)
@@ -174,16 +174,18 @@ fragment_names = FragmentNames()
 #-----------------------------------------------------------------------
 
 class CodeLine():
-    """A CodeLine is a line of code text from a File or Fragment."""
+    """A CodeLine is a line of code text from a File or Fragment,
+    including any terminating \n."""
 
     # Regexes for matching fragment invocations and any
     # parameters. Note, at this time only the old-style bracketed
     # parameterisation is handled.
-    invocation_matcher = re.compile(r'(?P<start>.*)'
+    invocation_matcher = re.compile(r'(?s)'
+                                    + r'(?P<start>.*)'
                                     + r'@<'
                                     + r'(?P<invocation>.*?)'
                                     + r'@>'
-                                    + r'(?P<end>).*')
+                                    + r'(?P<end>.*)')
     parameter_matcher = re.compile(r'(?P<name>.*)'
                                    + r'(@\((?P<parameters>.*)@\))')
 
@@ -260,7 +262,7 @@ class LiteralCodeLine(CodeLine):
     def write_code(self, stream, indent, parameters):
         """Writes self to 'stream' as code, indented by 'indent', with
         substitution of 'parameters'."""
-        stream.write("%s%s\n"
+        stream.write("%s%s"
                      % (indent,
                         CodeLine.substitute_parameters(self.text, parameters)))
 
@@ -281,7 +283,6 @@ class InvocatingCodeLine(CodeLine):
             name = n.group('name').strip()
             parameters = re.split(r'\s*@,\s*',
                                   n.group('parameters').strip())
-            #parameters = [p.strip() for p in parameters]
         else:
             parameters = []
         self.start = m.group('start')
@@ -294,12 +295,18 @@ class InvocatingCodeLine(CodeLine):
         stream.write(self.start)
         params = [CodeLine.substitute_parameters(p, parameters)
                   for p in self.parameters]
-        for d in document:
-            if d.matches(self.name):
-                d.write_code(stream,
-                             indent \
-                                 + re.sub(r'\S', ' ', self.start).expandtabs(),
-                             params)
+        # Note the indent needed for the fragments (where we are now;
+        # the input indent was where we began, and we've now added the
+        # characters in the self.start sequence).
+        new_indent = indent +  re.sub(r'\S', ' ', self.start).expandtabs()
+        fragments = [d for d in document if d.matches(self.name)]
+        fragments[0].write_code(stream, new_indent, params)
+        for f in fragments[1:]:
+            # For follow-on fragments, we have to output the new
+            # indentation. NB, this assumes that if there is anything
+            # in self.end, there'll only be ome matching fragment.
+            stream.write(new_indent)
+            f.write_code(stream, new_indent, params)
         stream.write(self.end)
 
     def write_latex(self, stream):
@@ -434,11 +441,23 @@ class CodeElement(DocumentElement):
 
     def __init__(self, name, text, defines, splittable):
         self.name = name
-        # remove any CRs, rely on Python to generate CRLF on output if
-        # required.
-        self.text = re.sub(r'\r', '', text)
-        self.lines = [CodeLine.factory(l)
-                      for l in re.sub(r'\r', '', text).split("\n")]
+        # We want to split into lines, retaining the \n at the end of
+        # all lines that have one already (which may not include the
+        # last, or only, line).
+
+        # We do this by making sure that all line terminators are \n\r
+        # (NB, not the normal order) and splitting on \r.
+
+        # We rely on Python to generate \r\n on output if required.
+        text = re.sub(r'\r', '', text)
+        # XXX needed for generate_document()
+        self.text = text
+        text = re.sub(r'\n', r'\n\r', text)
+        # We need to keep the trailing \n, if there is one, but not to
+        # get an empty line because of the split on the trailing \r.
+        if text[-1] == '\r':
+            text = text[:-1]
+        self.lines = [CodeLine.factory(l) for l in text.split("\r")]
         self.defines = defines
         self.splittable = splittable
         self.scrap_number = CodeElement.scrap_number
@@ -446,12 +465,12 @@ class CodeElement(DocumentElement):
         code_elements[self.scrap_number] = self
 
     def write_code(self, stream, indent, parameters = []):
-        """Output the code to 'stream', indenting lines by 'indent'."""
-        for l in self.lines[:-1]:
+        """Output the code to 'stream', indenting all lines after the
+        first by 'indent', and skipping the last line if it's
+        blank."""
+        self.lines[0].write_code(stream, '', parameters)
+        for l in self.lines[1:]:
             l.write_code(stream, indent, parameters)
-        # Don't output the last line if it's blank.
-        if not self.lines[-1].is_empty():
-            self.lines[-1].write_code(stream, indent, parameters)
 
     def generate_document(self, output):
         output.write("\\begin{flushleft} \\small\n")
@@ -622,39 +641,6 @@ class Fragment(CodeElement):
                      "\\nobreak\\ {\\footnotesize{%s}}$\\,\\rangle\\equiv$\n"
                      % (link, self.name, link))
 
-def code_element_init(segment):
-    """Given a segment of the document that corresponds to a File or
-    Fragment, this factory function determines the kind, name, text
-    and definitions and returns an initialized CodeElement of the
-    right kind."""
-    matcher = re.compile(r'(?s)'
-                         + r'@(?P<kind>[oOdD])'
-                         + r'\s*'
-                         + r'(?P<name>.*?)'
-                         + r'@{(?P<text>.*?)'
-                         + r'(@\|(?P<defines>.*))?'
-                         + r'@}')
-    m = re.match(matcher, segment)
-    try:
-        kind = m.group('kind')
-        name = m.group('name').strip()
-        text = m.group('text')
-        if m.group('defines'):
-            defines = m.group('defines').split()
-        else:
-            defines = []
-    except:
-        sys.stderr.write("failed code_element_init(%s)\n" % segment)
-        sys.exit(1)
-    if kind == 'o':
-        return File(name, text, defines, False)
-    elif kind == 'O':
-        return File(name, text, defines, True)
-    elif kind == 'd':
-        return Fragment(name, text, defines, False)
-    elif kind == 'D':
-        return Fragment(name, text, defines, True)
-
 
 #-----------------------------------------------------------------------
 # Main
@@ -752,7 +738,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 6333e1851729 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 4dbcf31ca5ff $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
