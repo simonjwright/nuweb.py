@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v d7dc694639b0 2011/08/18 21:55:24 simonjwright $
+# $Id: nuweb.py,v 9583e6f87a23 2011/08/18 21:56:50 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -48,6 +48,11 @@ files = {}
 # generated as hyperlinks using the hyperref package (which needs to
 # be specified in your document).
 hyperlinks = False
+
+# 'need_to_rerun', if True, means we end with a message telling the
+# user she needs to re-run nuweb.py after running LaTeX (because of a
+# scrap number mismatch).
+need_to_rerun = False
 
 #-----------------------------------------------------------------------
 # Nuweb file i/o
@@ -161,7 +166,7 @@ class FragmentNames(dict):
 # In 'fragment_names' (which is a FragmentNames dictionary),
 # abbreviated keys (ending in "...") are only found if there's a
 # matching full definition.
-fragment_names = FragmentNames{}
+fragment_names = FragmentNames()
 
 
 #-----------------------------------------------------------------------
@@ -280,6 +285,10 @@ class CodeElement(DocumentElement):
         output.write("\\vspace{-1ex}\n")
         output.write("\\begin{list}{}{} \\item\n")
         lines = self.text.split("\n")
+        # Don't write the last line if it's empty (to avoid a blank
+        # line above the NWsep, which is diamond if not redefined).
+        if len(lines[-1]) == 0:
+            lines = lines[:-1]
         for l in lines:
             self.write_latex_line(output, l)
         output.write("\\mbox{}{\NWsep}\n")
@@ -296,6 +305,50 @@ class CodeElement(DocumentElement):
                 ["@'", "'"],
                 ["@,", ","],
                 ["@)", ")"]]
+        # Does this line invoke a fragment?
+        m = re.match(CodeElement.invocation_matcher, line)
+        if m:
+            # We need to find all the fragments which match this
+            # invocation.
+
+            # If there are none, no action (I suppose we could output
+            # a warning?).
+
+            # Otherwise, we output a page/scrap-on-page link just
+            # before the closing >.
+
+            # If there is only one the link is to that fragment.
+
+            # If there are more than one, the link is to the first,
+            # followed by ', ...'
+
+            # Assumption: only one invocation on a line!
+
+            name = m.group('invocation').strip()
+            # Check whether the invocation includes parameters.
+            n = re.match(CodeElement.parameter_matcher, name)
+            if n:
+                name = n.group('name').strip()
+            # Find all the elements with that name
+            elements = [e for e in document if e.matches(name)]
+            if len(elements) > 0:
+                e = elements[0]
+                try:
+                    link = "%s%s" % (e.page_number, e.scrap_on_page)
+                except:
+                    link = "??"
+                link = r'{\footnotesize \NWlink{nuweb%s}{%s}}' % (link, link)
+                if len(elements) > 1:
+                    link = link + ', ...'
+                # Reconstitute the original line, ready for
+                # substitution and output.
+                line = m.group('start') \
+                    + '@<' \
+                    + m.group('invocation') \
+                    + link \
+                    + ' @>' \
+                    + m.group('end')
+
         # Remove double-at, so that the @@ in a substring like "@@,"
         # doesn't remain live and cause the substring to get treated
         # as "@,".
@@ -310,7 +363,8 @@ class CodeElement(DocumentElement):
             r.append(re.sub(r'@([1-9])', r'@\\verb|@|\\verb@\1', l))
         # Finally, reinsert any "@@"s from the original line as just
         # "@", and output.
-        output.write("\\mbox{}\\verb@%s@\\\\\n" % "@\\verb|@|\\verb@".join(r))
+        output.write\
+            ("\\mbox{}\\verb@%s@\\\\\n" % "@\\verb|@|\\verb@".join(r))
 
 class File(CodeElement):
     """Forms part of a named file. The whole file is composed of all
@@ -458,12 +512,12 @@ def read_aux(path):
     Once we know whch page a scrap is on, and which scrap it is on
     that page, we can create the proper cross-reference."""
 
-    global code_elements
+    global code_elements, need_to_rerun
 
     try:
         input = open(path, 'r')
     except:
-        sys.stderr.write("couldn't open %s for input.\n" % path)
+        need_to_rerun = True
         return
 
     page = -1  # impossible value
@@ -478,8 +532,11 @@ def read_aux(path):
             else:
                 page = p
                 scrap_on_page = 'a'
-            code_elements[scrap].page_number = page
-            code_elements[scrap].scrap_on_page = scrap_on_page
+            try:
+                code_elements[scrap].page_number = page
+                code_elements[scrap].scrap_on_page = scrap_on_page
+            except:
+                need_to_rerun = True
 
 
 def main():
@@ -487,7 +544,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: d7dc694639b0 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 9583e6f87a23 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
@@ -592,6 +649,9 @@ def main():
         d.generate_document(doc)
 
     doc.close()
+
+    if need_to_rerun:
+        sys.stderr.write('Need to re-run nuweb.py after running latex.\n')
 
 
 if __name__ == '__main__':
