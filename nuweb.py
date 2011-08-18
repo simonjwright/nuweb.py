@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v 0e69d73746a4 2011/08/18 21:58:37 simonjwright $
+# $Id: nuweb.py,v 10e7ef5077e5 2011/08/18 21:59:20 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -293,8 +293,10 @@ class CodeElement(DocumentElement):
             self.write_latex_line(output, l)
         output.write("\\mbox{}{\NWsep}\n")
         output.write("\\end{list}\n")
+        output.write("\\vspace{-1ex}\n")
+        # Cross-references go here.
         if not self.splittable:
-            output.write("\\end{minipage}\\vspace{2ex}\n")
+            output.write("\\end{minipage}\n")
         output.write("\\end{flushleft}\n")
 
     def write_latex_line(self, output, line):
@@ -572,7 +574,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 0e69d73746a4 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 10e7ef5077e5 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
