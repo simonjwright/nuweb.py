@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v a22c4b14bc2a 2011/08/18 22:04:56 simonjwright $
+# $Id: nuweb.py,v 05297ffc76b4 2011/08/18 22:05:34 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -372,18 +372,64 @@ class InvocatingCodeLine(CodeLine):
 
 
 #-----------------------------------------------------------------------
+# Identifier class and children
+#-----------------------------------------------------------------------
+
+class Identifier():
+    """The abstract root of the user-defined identifier classes."""
+
+    @staticmethod
+    def factory(match):
+        if re.match(r'[a-zA-Z0-9_.]+$', match):
+            return NormalIdentifier(match)
+        else:
+            return AbnormalIdentifier(match)
+
+    def matches(self, text):
+        """'line' is a code line (or, for a parameterised , a
+        parameter)."""
+        return False
+
+class NormalIdentifier(Identifier):
+    """A NormalIdentifier consists of alphanumerics, underscore or
+    period. It will match text that contains the match text supplied
+    provided it isn't surrounded by any text that could itself form
+    part of a NormalIdentifier."""
+
+    def __init__(self, match):
+        self.match = re.compile(r'(^|[^a-zA-Z0-9_.])' \
+                                    + match \
+                                    + r'($|[^a-zA-Z0-9_.])')
+
+    def matches(self, text):
+        return re.search(self.match, text)
+
+class AbnormalIdentifier(Identifier):
+    """An AbnormalIdentifier contains at least one character that
+    isn't allowed in a NormalIdentifier. It will match text that
+    contains the match text, so may cause problems with ambiguity (for
+    example, 'here$' would match a line containing 'there$')."""
+
+    def __init__(self, match):
+        self.match = re.compile(match)
+
+    def matches(self, text):
+        return re.search(self.match, text)
+
+
+#-----------------------------------------------------------------------
 # DocumentElement class and children
 #-----------------------------------------------------------------------
 
 class DocumentElement():
-    """The abstract root of the tree of elements that make up the
+    """The abstract root of the element classes that make up the
     document. The document is a sequence of Text, Code and Index
     elements."""
     def generate_code(self):
         pass
     def generate_document(self, output):
         output.write(self.text)
-    def matches(self, definition):
+    def matches(self, identifier):
         return False
     def defined_by(self):
         """Returns a list of other Fragments with the same name, ie
@@ -393,13 +439,14 @@ class DocumentElement():
         """Returns a list of CodeElements which reference this
         Fragment."""
         return []
-    def defines(self):
-        """Returns a list of the variable definitions made by this
-        CodeElement and where they're used."""
+    def used_identifiers(self):
+        """Returns a list of the identifier definitions made by this
+        CodeElement and their users: [[identifier, [element]]]."""
         return []
-    def uses(self):
-        """Returns a list of the variable definitions used by this
-        CodeElement (not including any it defines itself)."""
+    def uses_identifiers(self):
+        """Returns a list of all the identifier definitions made by
+        other CodeElements and used in this one:
+        [[element, [identifier]]]."""
         return []
 
 class Text(DocumentElement):
@@ -411,10 +458,11 @@ class CodeElement(DocumentElement):
     """May be a File or a Fragment.
 
     'name' is either the file name or the definition name.  'text' is
-    the code content.  'definitions' is a list of the identifiers
-    defined by the element.  'splittable' is True if the text is
-    allowed to be split over a page boundary in the printed document
-    (otherwise a minipage environment is used to prevent splitting)."""
+    the code content.  'identifiers' is a list of the identifiers
+    defined by the element [[text, match]].  'splittable' is True if
+    the text is allowed to be split over a page boundary in the
+    printed document (otherwise a minipage environment is used to
+    prevent splitting)."""
 
     # The scrap sequence number, used as the index (key) to
     # code_elements.
@@ -424,35 +472,35 @@ class CodeElement(DocumentElement):
     def factory(segment):
         """Given a segment of the document that corresponds to a File or
         Fragment, this factory function determines the kind, name, text
-        and definitions and returns an initialized CodeElement of the
+        and identifiers and returns an initialized CodeElement of the
         right kind."""
         matcher = re.compile(r'(?s)'
                              + r'@(?P<kind>[oOdD])'
                              + r'\s*'
                              + r'(?P<name>.*?)'
                              + r'@{(?P<text>.*?)'
-                             + r'(@\|(?P<definitions>.*))?'
+                             + r'(@\|(?P<identifiers>.*))?'
                              + r'@}')
         m = re.match(matcher, segment)
         try:
             kind = m.group('kind')
             name = m.group('name').strip()
             text = m.group('text')
-            if m.group('definitions'):
-                definitions = m.group('definitions').split()
+            if m.group('identifiers'):
+                identifiers = m.group('identifiers').split()
             else:
-                definitions = []
+                identifiers = []
         except:
             sys.stderr.write("failed CodeElement.factory(%s)\n" % segment)
             sys.exit(1)
         if kind == 'o':
-            return File(name, text, definitions, False)
+            return File(name, text, identifiers, False)
         elif kind == 'O':
-            return File(name, text, definitions, True)
+            return File(name, text, identifiers, True)
         elif kind == 'd':
-            return Fragment(name, text, definitions, False)
+            return Fragment(name, text, identifiers, False)
         elif kind == 'D':
-            return Fragment(name, text, definitions, True)
+            return Fragment(name, text, identifiers, True)
 
     @staticmethod
     def write_elements(stream, elements):
@@ -481,7 +529,7 @@ class CodeElement(DocumentElement):
         # Finish with a period.
         stream.write(".")
 
-    def __init__(self, name, text, definitions, splittable):
+    def __init__(self, name, text, identifiers, splittable):
         self.name = name
         # We want to split into lines, retaining the \n at the end of
         # all lines that have one already (which may not include the
@@ -493,14 +541,15 @@ class CodeElement(DocumentElement):
         # We rely on Python to generate \r\n on output if required.
         text = re.sub(r'\r', '', text)
         # XXX needed for generate_document()
-        self.text = text
+        #self.text = text
         text = re.sub(r'\n', r'\n\r', text)
         # We need to keep the trailing \n, if there is one, but not to
-        # get an empty line because of the split on the trailing \r.
-        if text[-1] == '\r':
+        # get an extra empty line because of the split on the trailing
+        # \r.
+        if len(text) > 0 and text[-1] == '\r':
             text = text[:-1]
         self.lines = [CodeLine.factory(l) for l in text.split("\r")]
-        self.definitions = definitions
+        self.identifiers = [[d, Identifier.factory(d)] for d in identifiers]
         self.splittable = splittable
         self.scrap_number = CodeElement.scrap_number
         CodeElement.scrap_number = CodeElement.scrap_number + 1
@@ -529,16 +578,15 @@ class CodeElement(DocumentElement):
         output.write("\\end{list}\n")
         output.write("\\vspace{-1ex}\n")
         defined_by = self.defined_by()
-        referenced_in = self.referenced_in()
-        defines = self.defines()
-        uses = self.uses()
+        uses_identifiers = self.uses_identifiers()
         if len(defined_by) > 1 \
-                or len(referenced_in) > 0 \
-                or len(defines) > 0 \
-                or len(uses) > 0:
+                or isinstance(self, Fragment) \
+                or len(uses_identifiers) > 0:
             # We only create this list environment for the
             # crossreferences if there are any (otherwise, we'd have
-            # to create an empty \item)
+            # to create an empty \item). There's always at least one
+            # item for a Fragment (either 'referenced in' or 'never
+            # referenced').
             output.write("\\vspace{-1ex}\n")
             output.write("\\footnotesize\n")
             output.write("\\begin{list}{}{")
@@ -547,18 +595,24 @@ class CodeElement(DocumentElement):
             output.write("}\n")
 
             if len(defined_by) > 1:
-                output.write("\\item \NWtxtMacroDefBy\ ")
+                output.write("\\item \\NWtxtMacroDefBy\\ ")
                 CodeElement.write_elements(output, defined_by)
                 output.write("\n")
 
-            if len(referenced_in) > 0:
-                output.write("\\item \NWtxtMacroRefIn\ ")
-                CodeElement.write_elements(output, referenced_in)
-                output.write("\n")
+            if isinstance(self, Fragment):
+                referenced_in = self.referenced_in()
+                if len(referenced_in) > 0:
+                    output.write("\\item \\NWtxtMacroRefIn\\ ")
+                    CodeElement.write_elements(output, referenced_in)
+                    output.write("\n")
+                else:
+                    output.write("\\item \\NWtxtMacroNoRef.\n")
+                used_identifiers = self.used_identifiers()
+                if len(used_identifiers) > 0:
+                    pass
 
-            #sys.stderr.write("'%s' defined_by %d fragments.\n" % (self.name, len(defined_by)))
-
-            output.write("\\item{}\n")
+            if len(uses_identifiers) > 0:
+                pass
 
             output.write("\\end{list}\n")
         if not self.splittable:
@@ -580,24 +634,34 @@ class CodeElement(DocumentElement):
                     and hasattr(e, 'lines') \
                     and invokes_self(e.lines)]
 
-    def XXXdefines(self):
-        """Returns a list of the variable definitions made by this
-        CodeElement."""
-        return self.definitions
+    def used_identifiers(self):
+        """Returns a list of the identifier definitions made by this
+        CodeElement and their users: [[identifier, [element]]]."""
+        code = [c for c in document
+                if isinstance(c, CodeElement) and c != self]
+        return []
+
+    def uses_identifiers(self):
+        """Returns a list of all the identifier definitions made by
+        other CodeElements and used in this one:
+        [[element, [identifier]]]."""
+        code = [c for c in document
+                if isinstance(c, CodeElement) and c != self]
+        return []
 
 class File(CodeElement):
     """Forms part of a named file. The whole file is composed of all
     the File objects with the same name, concatenated in document
     order."""
 
-    def __init__(self, name, text, definitions, splittable):
+    def __init__(self, name, text, identifiers, splittable):
         """The 'name' consists of a filename (without spaces) and
         optional flags."""
         name_parts = name.split()
         CodeElement.__init__(self,
                              name_parts[0],
                              text,
-                             definitions,
+                             identifiers,
                              splittable)
         self.flags = name_parts[1:]
 
@@ -643,7 +707,7 @@ class Fragment(CodeElement):
                      % (link, self.name, link))
 
     def defined_by(self):
-        """Returns a list of other Fragments with the same name, ie
+        """Returns a list of all the Fragments with the same name, ie
         which taken together define the whole fragment."""
         return [d for d in document if d.matches(self.name)]
 
@@ -744,7 +808,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: a22c4b14bc2a $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 05297ffc76b4 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
