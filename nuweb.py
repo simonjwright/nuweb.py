@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v f38fdc493e6b 2011/08/18 22:06:55 simonjwright $
+# $Id: nuweb.py,v 2c050eacbf68 2011/08/18 22:07:44 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -544,8 +544,6 @@ class CodeElement(DocumentElement):
 
         # We rely on Python to generate \r\n on output if required.
         text = re.sub(r'\r', '', text)
-        # XXX needed for generate_document()
-        #self.text = text
         text = re.sub(r'\n', r'\n\r', text)
         # We need to keep the trailing \n, if there is one, but not to
         # get an extra empty line because of the split on the trailing
@@ -833,7 +831,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: f38fdc493e6b $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 2c050eacbf68 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
