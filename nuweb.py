@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v 05297ffc76b4 2011/08/18 22:05:34 simonjwright $
+# $Id: nuweb.py,v bb7489d7b86a 2011/08/18 22:06:19 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -246,6 +246,9 @@ class CodeLine():
     def invokes(self, name):
         return False
 
+    def matches_identifier(self, identifier):
+        return False
+
 class LiteralCodeLine(CodeLine):
     """A line of code that contains text but no fragment invocations."""
 
@@ -264,6 +267,9 @@ class LiteralCodeLine(CodeLine):
         line = re.sub(r'\n', '', self.text)
         stream.write("\\mbox{}\\verb@%s@\\\\\n"
                      % CodeLine.substitute_at_symbols(line))
+
+    def matches_identifier(self, identifier):
+        return identifier.matches(self.text)
 
 class InvocatingCodeLine(CodeLine):
     """A line of code that contains a fragment invocation."""
@@ -609,10 +615,12 @@ class CodeElement(DocumentElement):
                     output.write("\\item \\NWtxtMacroNoRef.\n")
                 used_identifiers = self.used_identifiers()
                 if len(used_identifiers) > 0:
-                    pass
+                    print(used_identifiers)
+                    output.write("\\item{Identifiers used!}\n")
 
             if len(uses_identifiers) > 0:
-                pass
+                # XXX
+                output.write("\\item{Uses identifiers!}\n");
 
             output.write("\\end{list}\n")
         if not self.splittable:
@@ -639,7 +647,17 @@ class CodeElement(DocumentElement):
         CodeElement and their users: [[identifier, [element]]]."""
         code = [c for c in document
                 if isinstance(c, CodeElement) and c != self]
-        return []
+        result = []
+        for i in self.identifiers:
+            elements = []
+            for c in code:
+                for l in c.lines:
+                    if l.matches_identifier(i[1]):
+                        elements.append(c)
+                        break
+            if len(elements) > 0:
+                result.append([i[0], elements])
+        return result
 
     def uses_identifiers(self):
         """Returns a list of all the identifier definitions made by
@@ -808,7 +826,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 05297ffc76b4 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: bb7489d7b86a $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
