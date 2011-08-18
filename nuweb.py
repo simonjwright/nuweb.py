@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v 390db7050b54 2011/08/18 22:10:32 simonjwright $
+# $Id: nuweb.py,v 147b765839e1 2011/08/18 22:11:13 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -453,7 +453,7 @@ class DocumentElement():
     def uses_identifiers(self):
         """Returns a list of all the identifier definitions made by
         other CodeElements and used in this one:
-        [[element, [identifier]]]."""
+        [[identifier-text, [element]]]."""
         return []
 
 class Text(DocumentElement):
@@ -606,6 +606,13 @@ class CodeElement(DocumentElement):
             output.write("\\setlength{\\itemindent}{-\\leftmargin}")
             output.write("}\n")
 
+            def write_id_and_uses(i):
+                output.write("\\verb@%s@\\ " % i[0])
+                if len(i[1]) > 0:
+                    CodeElement.write_elements(output, i[1])
+                else:
+                    output.write("\\NWtxtIdentsNotUsed")
+
             if len(defined_by) > 1:
                 output.write("\\item \\NWtxtMacroDefBy\\ ")
                 CodeElement.write_elements(output, defined_by)
@@ -621,12 +628,6 @@ class CodeElement(DocumentElement):
                     output.write("\\item \\NWtxtMacroNoRef.\n")
                 used_identifiers = self.used_identifiers()
                 if len(used_identifiers) > 0:
-                    def write_id_and_uses(i):
-                        output.write("\\verb@%s@\\ " % i[0])
-                        if len(i[1]) > 0:
-                            CodeElement.write_elements(output, i[1])
-                        else:
-                            output.write("\\NWtxtIdentsNotUsed")
                     output.write("\\item \\NWtxtIdentsDefed\\ ")
                     for i in used_identifiers[:-1]:
                         write_id_and_uses(i)
@@ -635,8 +636,12 @@ class CodeElement(DocumentElement):
                     output.write(".\\\\\n")
 
             if len(uses_identifiers) > 0:
-                # XXX
-                output.write("\\item{Uses identifiers!}\n");
+                output.write("\\item \\NWtxtIdentsUsed\\ ")
+                for i in uses_identifiers[:-1]:
+                    write_id_and_uses(i)
+                    output.write(", ")
+                write_id_and_uses(uses_identifiers[-1])
+                output.write(".\\\\\n")
 
             output.write("\\end{list}\n")
         if not self.splittable:
@@ -677,10 +682,22 @@ class CodeElement(DocumentElement):
     def uses_identifiers(self):
         """Returns a list of all the identifier definitions made by
         other CodeElements and used in this one:
-        [[element, [identifier-text]]]."""
+        [[identifier-text, [element]]]."""
         code = [c for c in document
                 if isinstance(c, CodeElement) and c != self]
-        return []
+        matches = {}
+        for c in code:
+            for i in c.identifiers:
+                for l in self.lines:
+                    if l.matches_identifier(i[1]):
+                        value = matches.get(i[0], [])
+                        value.append(c)
+                        matches[i[0]] = value
+                        break
+        result = []
+        for k in sorted(matches.keys()):
+            result.append([k, matches[k]])
+        return result
 
 class File(CodeElement):
     """Forms part of a named file. The whole file is composed of all
@@ -841,7 +858,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 390db7050b54 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 147b765839e1 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
