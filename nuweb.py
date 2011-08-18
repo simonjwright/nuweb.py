@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v 4dbcf31ca5ff 2011/08/18 22:01:07 simonjwright $
+# $Id: nuweb.py,v 50df114f5e58 2011/08/18 22:01:47 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -93,7 +93,7 @@ class OutputCodeFile:
     doesn't already exist, or has changed, the new contents are
     written to it.
 
-    Also replaces @@ by @.
+    Also replaces @@ by @. (XXX haven't we done this already?)
 
     Also ensures that trailing white space is eliminated from all code
     output files. This is really just for neatness, but in the case of
@@ -177,9 +177,9 @@ class CodeLine():
     """A CodeLine is a line of code text from a File or Fragment,
     including any terminating \n."""
 
-    # Regexes for matching fragment invocations and any
-    # parameters. Note, at this time only the old-style bracketed
-    # parameterisation is handled.
+    # Regexes for matching fragment invocations and any parameters
+    # while reading in. Note, at this time only the old-style
+    # bracketed parameterisation is handled.
     invocation_matcher = re.compile(r'(?s)'
                                     + r'(?P<start>.*)'
                                     + r'@<'
@@ -234,11 +234,6 @@ class CodeLine():
 
         return str
 
-    def is_empty(self):
-        """Overridden by LiteralCodeLine to return True if the line is
-        empty."""
-        return False
-
     def write_code(self, stream, indent, parameters):
         """Writes self to 'stream' as code, indented by 'indent'. To
         be overridden."""
@@ -254,11 +249,6 @@ class LiteralCodeLine(CodeLine):
     def __init__(self, line):
         self.text = line
 
-    def is_empty(self):
-        """Overridden by LiteralCodeLine to return True if the line is
-        empty."""
-        return self.text == ''
-
     def write_code(self, stream, indent, parameters):
         """Writes self to 'stream' as code, indented by 'indent', with
         substitution of 'parameters'."""
@@ -268,8 +258,9 @@ class LiteralCodeLine(CodeLine):
 
     def write_latex(self, stream):
         """Writes self to 'stream' as LaTeX."""
+        line = re.sub(r'\n', '', self.text)
         stream.write("\\mbox{}\\verb@%s@\\\\\n"
-                     % CodeLine.substitute_at_symbols(self.text))
+                     % CodeLine.substitute_at_symbols(line))
 
 class InvocatingCodeLine(CodeLine):
     """A line of code that contains a fragment invocation."""
@@ -303,8 +294,9 @@ class InvocatingCodeLine(CodeLine):
         fragments[0].write_code(stream, new_indent, params)
         for f in fragments[1:]:
             # For follow-on fragments, we have to output the new
-            # indentation. NB, this assumes that if there is anything
-            # in self.end, there'll only be ome matching fragment.
+            # indentation at the beginning of the new line. NB, this
+            # assumes that if there is anything in self.end, there'll
+            # only be ome matching fragment.
             stream.write(new_indent)
             f.write_code(stream, new_indent, params)
         stream.write(self.end)
@@ -330,14 +322,15 @@ class InvocatingCodeLine(CodeLine):
 
         # Check whether the invocation includes parameters, and
         # form the LaTeX text accordingly.
-        if length(self.parameters) > 0:
-            parameters = [substitute_at_symbols(p) for p in self.parameters]
+        if len(self.parameters) > 0:
+            parameters = [CodeLine.substitute_at_symbols(p)
+                          for p in self.parameters]
             text = r'{\it %s}\ (\verb@%s@)' % (self.name,
                                                ", ".join(parameters))
         else:
-            text = r'{\it %s}' % name
+            text = r'{\it %s}' % self.name
         # Find all the elements with the invoked name
-        elements = [e for e in document if e.matches(name)]
+        elements = [e for e in document if e.matches(self.name)]
         if len(elements) > 0:
             e = elements[0]
             try:
@@ -350,16 +343,17 @@ class InvocatingCodeLine(CodeLine):
         if len(elements) > 1:
             link = link + r',\ ...'
         # Reconstitute the line, making substitutions.
-        line = CodeLine.substitute_at_symbols(m.group('start')) \
+        line = CodeLine.substitute_at_symbols(self.start) \
             + r'@$\langle\,$' \
             + text \
             + r'\ ' \
             + link \
             + r'\,$\rangle\,$\verb@' \
-            + CodeLine.substitute_at_symbols(m.group('end'))
+            + CodeLine.substitute_at_symbols(re.sub(r'\n', '', self.end))
 
         # Output the line.
-        output.write("\\mbox{}\\verb@%s@\\\\\n" % line)
+        stream.write("\\mbox{}\\verb@%s@\\\\\n" % line)
+
 
 #-----------------------------------------------------------------------
 # DocumentElement class and children
@@ -387,23 +381,12 @@ class CodeElement(DocumentElement):
     'name' is either the file name or the definition name.  'text' is
     the code content.  'defines' is a list of the identifiers defined
     by the element.  'splittable' is True if the text is allowed to be
-    split over a page boundary in the printed document (a minipage
-    environment is used to prevent splitting if necessary)."""
+    split over a page boundary in the printed document (otherwise a
+    minipage environment is used to prevent splitting)."""
 
     # The scrap sequence number, used as the index (key) to
     # code_elements.
     scrap_number = 1
-
-    # Regexes for matching fragment invocations and any
-    # parameters. Note, at this time only the old-style bracketed
-    # parameterisation is handled.
-    invocation_matcher = re.compile(r'(?P<start>.*)'
-                                    + r'@<'
-                                    + r'(?P<invocation>.*?)'
-                                    + r'@>'
-                                    + r'(?P<end>).*')
-    parameter_matcher = re.compile(r'(?P<name>.*)'
-                                   + r'(@\((?P<parameters>.*)@\))')
 
     @staticmethod
     def factory(segment):
@@ -481,13 +464,8 @@ class CodeElement(DocumentElement):
         self.write_title(output)
         output.write("\\vspace{-1ex}\n")
         output.write("\\begin{list}{}{} \\item\n")
-        lines = self.text.split("\n")
-        # Don't write the last line if it's empty (to avoid a blank
-        # line above the NWsep, which is diamond if not redefined).
-        if len(lines[-1]) == 0:
-            lines = lines[:-1]
-        for l in lines:
-            self.write_latex_line(output, l)
+        for l in self.lines:
+            l.write_latex(output)
         output.write("\\mbox{}{\NWsep}\n")
         output.write("\\end{list}\n")
         output.write("\\vspace{-1ex}\n")
@@ -495,103 +473,6 @@ class CodeElement(DocumentElement):
         if not self.splittable:
             output.write("\\end{minipage}\n")
         output.write("\\end{flushleft}\n")
-
-    def write_latex_line(self, output, line):
-        """The whole 'line' is written to 'output' as verbatim LaTeX text."""
-
-        # The \verb delimiter is @, which means we need extra care
-        # when the text to be output itself contains an @, or if we
-        # want to inset LaTeX.
-
-        def substitute_at_symbols(str):
-            """Performs the @ substitutions."""
-
-            # Remove double-at, so that the @@ in a substring like "@@,"
-            # doesn't remain live and cause the substring to get treated
-            # as "@,".
-            # Split at '@@' (later, we'll rejoin with '@').
-            ss = str.split("@@")
-
-            # Un-escape @( etc. Parameters like '@1' must appear as
-            # themselves, which is slightly awkward because the LaTeX
-            # output is embedded in \verb@...@. Any @ we want to appear in
-            # the output is inserted by terminating the current \verb@
-            # environment, including a \verb|@|, and restarting the verb@
-            # environment.
-            def subs(st):
-                for s in [["@(", "("], ["@'", "'"], ["@,", ","], ["@)", ")"]]:
-                    st = st.replace(s[0], s[1])
-                return st
-            ss = [re.sub(r'@([1-9])',
-                         r'@\\verb|@|\\verb@\1',
-                         subs(s))
-                  for s in ss]
-
-            # Rejoin the string with a verbatim @.
-            str = r'@\verb|@|\verb@'.join(ss)
-
-            return str
-
-        # Does this line invoke a fragment? If so, we need to
-        # determine what is invoked and include a link to the
-        # declaration (or the first and an ellipsis, if more than
-        # one). Otherwise, we can just substitute at-symbols.
-        m = re.match(CodeElement.invocation_matcher, line)
-        if m:
-            # We need to find all the fragments which match this
-            # invocation.
-
-            # If there are none, no action (I suppose we could output
-            # a warning?).
-
-            # Otherwise, we output a page/scrap-on-page link just
-            # before the closing >.
-
-            # If there is only one the link is to that fragment.
-
-            # If there are more than one, the link is to the first,
-            # followed by ', ...'
-
-            # Assumption: only one invocation on a line!
-
-            name = m.group('invocation').strip()
-            parameters = ''
-            # Check whether the invocation includes parameters, and
-            # form the LaTeX text accordingly.
-            n = re.match(CodeElement.parameter_matcher, name)
-            if n:
-                name = n.group('name').strip()
-                parameters = \
-                    substitute_at_symbols(n.group('parameters').strip())
-                text = r'{\it %s}\ (\verb@%s@)' % (name, parameters)
-            else:
-                text = r'{\it %s}' % name
-            # Find all the elements with that name
-            elements = [e for e in document if e.matches(name)]
-            if len(elements) > 0:
-                e = elements[0]
-                try:
-                    link = '%s%s' % (e.page_number, e.scrap_on_page)
-                except:
-                    link = '??'
-                link = r'{\footnotesize \NWlink{nuweb%s}{%s}}' % (link, link)
-                if len(elements) > 1:
-                    link = link + ', ...'
-                # Reconstitute the line, making substitutions.
-                line = substitute_at_symbols(m.group('start')) \
-                    + r'@$\langle\,$' \
-                    + text \
-                    + r'\ ' \
-                    + link \
-                    + r'\,$\rangle\,$\verb@' \
-                    + substitute_at_symbols(m.group('end'))
-
-        else:
-            # No invocation on this line.
-            line = substitute_at_symbols(line)
-
-        # Output the line.
-        output.write("\\mbox{}\\verb@%s@\\\\\n" % line)
 
 class File(CodeElement):
     """Forms part of a named file. The whole file is composed of all
@@ -738,7 +619,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 4dbcf31ca5ff $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 50df114f5e58 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
