@@ -13,10 +13,9 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
+# $Id: nuweb.py,v 07b147e275ba 2011/08/19 21:42:34 simonjwright $
 
-# $Id: nuweb.py,v 229f1a49169d 2011/08/19 19:20:04 simonjwright $
-
-import getopt, re, tempfile, os, sys
+import getopt, os, re, sys, tempfile, time
 
 
 #-----------------------------------------------------------------------
@@ -571,7 +570,7 @@ class CodeElement(DocumentElement):
         if len(text) > 0 and text[-1] == '\r':
             text = text[:-1]
         self.lines = [CodeLine.factory(l) for l in text.split("\r")]
-        self.identifiers = [[d, Identifier.factory(d)] for d in identifiers]
+        self.identifiers = [[i, Identifier.factory(i)] for i in identifiers]
         self.splittable = splittable
         self.scrap_number = CodeElement.scrap_number
         CodeElement.scrap_number = CodeElement.scrap_number + 1
@@ -776,6 +775,8 @@ class Index(DocumentElement):
 
     @staticmethod
     def factory(id):
+        """Creates and returns the appropriate type of Index given the
+        'id'."""
         return {
             'f' : lambda: FileIndex(),
             'm' : lambda: MacroIndex(),
@@ -783,9 +784,7 @@ class Index(DocumentElement):
             }[id]()
 
     def generate_latex(self, output):
-        """The default is to output nothing."""
-        # XXX For development, display self.
-        print self
+        """To be overridden."""
         pass
 
 class FileIndex(Index):
@@ -793,6 +792,7 @@ class FileIndex(Index):
     with the elements that define them."""
 
     def generate_latex(self, output):
+        start = time.clock()
         files = {}
         for d in document:
             if isinstance(d, File):
@@ -810,18 +810,52 @@ class FileIndex(Index):
                 CodeElement.write_elements(output, files[f])
                 output.write(".}\n")
             output.write("\\end{list}}\n")
+        sys.stderr.write("generating the file index took %.3gs.\n"
+                         % (time.clock() - start))
 
 
 class MacroIndex(Index):
+    """Outputs an index of all the fragments in the docment, stating
+    where defined and where used."""
 
     def generate_latex(self, output):
-        output.write("\n\nMacroIndex\n\n")
+        start = time.clock()
+        definitions = {}
+        uses = {}
+        for d in document:
+            if isinstance(d, Fragment):
+                defs = definitions.get(d.name, [])
+                defs.append(d)
+                definitions[d.name] = defs
+        if len(definitions) > 0:
+            output.write("{\\small\\begin{list}{}{")
+            output.write("\\setlength{\\itemsep}{-\\parsep}")
+            output.write("\\setlength{\\itemindent}{-\\leftmargin}")
+            output.write("}\n")
+
+            for d in sorted(definitions.keys()):
+                output.write("\\item $\\langle\\,$%s\\nobreak\\ " % d)
+                output.write("{\\footnotesize ")
+                CodeElement.write_elements(output, definitions[d])
+                output.write("}$\\,\\rangle$ ")
+
+                output.write("{\\footnotesize ")
+                # here go the uses of d.
+                output.write(".}\n")
+
+            output.write("\\end{list}}\n")
+
+        sys.stderr.write("generating the macro index took %.3gs.\n"
+                         % (time.clock() - start))
 
 
 class IdentifierIndex(Index):
 
     def generate_latex(self, output):
+        start = time.clock()
         output.write("\n\nIdentifierIndex\n\n")
+        sys.stderr.write("generating the identifier index took %.3gs.\n"
+                         % (time.clock() - start))
 
 
 #-----------------------------------------------------------------------
@@ -930,7 +964,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 229f1a49169d $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 07b147e275ba $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
