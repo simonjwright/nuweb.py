@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v a3b90a2bbbd9 2011/08/19 14:09:03 simonjwright $
+# $Id: nuweb.py,v 229f1a49169d 2011/08/19 19:20:04 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -258,13 +258,20 @@ class LiteralCodeLine(CodeLine):
     def write_code(self, stream, indent, parameters):
         """Writes self to 'stream' as code, indented by 'indent', with
         substitution of 'parameters'."""
-        stream.write("%s%s"
-                     % (indent,
-                        CodeLine.substitute_parameters(self.text, parameters)))
+        # '@#' (at the start of the text) means don't indent.
+        # XXX more at-characters?
+        text = CodeLine.substitute_parameters(self.text, parameters)
+        if re.match(r'@#', text):
+            text = text[2:]
+            indent = ""
+        stream.write("%s%s" % (indent, text))
 
     def write_latex(self, stream):
         """Writes self to 'stream' as LaTeX."""
+        # Remove leading '@#'.
+        # XXX more at-characters?
         line = re.sub(r'\n', '', self.text)
+        line = re.sub(r'^@#', '', line)
         stream.write("\\mbox{}\\verb@%s@\\\\\n"
                      % CodeLine.substitute_at_symbols(line))
 
@@ -471,6 +478,16 @@ class CodeElement(DocumentElement):
     printed document (otherwise a minipage environment is used to
     prevent splitting)."""
 
+    # Matches a CodeEement for factory(). Take care not to terminate
+    # early on "@@}" (unusual, but occurs in nuweb.w).
+    element_matcher = re.compile(r'(?s)'
+                                 + r'@(?P<kind>[oOdD])'
+                                 + r'\s*'
+                                 + r'(?P<name>.*?)'
+                                 + r'@{(?P<text>.*?)'
+                                 + r'(@\|(?P<identifiers>.*))?'
+                                 + r'(?<!@)@}')
+
     # The scrap sequence number, used as the index (key) to
     # code_elements.
     scrap_number = 1
@@ -481,14 +498,7 @@ class CodeElement(DocumentElement):
         Fragment, this factory function determines the kind, name, text
         and identifiers and returns an initialized CodeElement of the
         right kind."""
-        matcher = re.compile(r'(?s)'
-                             + r'@(?P<kind>[oOdD])'
-                             + r'\s*'
-                             + r'(?P<name>.*?)'
-                             + r'@{(?P<text>.*?)'
-                             + r'(@\|(?P<identifiers>.*))?'
-                             + r'@}')
-        m = re.match(matcher, segment)
+        m = re.match(CodeElement.element_matcher, segment)
         try:
             kind = m.group('kind')
             name = m.group('name').strip()
@@ -845,7 +855,9 @@ def read_nuweb(path):
             document.append(Text(latex_text))
             element_text = ''
             line = m.group('start')
-            while not re.search(r'@}', line):
+            # We have to avoid premature termination at a line
+            # containing '@@}' (unusual, but nuweb.w has this).
+            while not re.search(r'(?<!@)@}', line):
                 element_text = element_text + line
                 line = input.readline()
                 if input.at_end:
@@ -918,7 +930,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: a3b90a2bbbd9 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 229f1a49169d $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
