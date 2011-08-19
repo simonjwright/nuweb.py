@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 07b147e275ba 2011/08/19 21:42:34 simonjwright $
+# $Id: nuweb.py,v 20e1a6325a61 2011/08/19 22:03:48 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -821,7 +821,6 @@ class MacroIndex(Index):
     def generate_latex(self, output):
         start = time.clock()
         definitions = {}
-        uses = {}
         for d in document:
             if isinstance(d, Fragment):
                 defs = definitions.get(d.name, [])
@@ -832,19 +831,20 @@ class MacroIndex(Index):
             output.write("\\setlength{\\itemsep}{-\\parsep}")
             output.write("\\setlength{\\itemindent}{-\\leftmargin}")
             output.write("}\n")
-
             for d in sorted(definitions.keys()):
                 output.write("\\item $\\langle\\,$%s\\nobreak\\ " % d)
                 output.write("{\\footnotesize ")
                 CodeElement.write_elements(output, definitions[d])
                 output.write("}$\\,\\rangle$ ")
-
                 output.write("{\\footnotesize ")
-                # here go the uses of d.
+                uses = definitions[d][0].referenced_in()
+                if len(uses) > 0:
+                    output.write("{\\NWtxtRefIn} ")
+                    CodeElement.write_elements(output, uses)
+                else:
+                    output.write("{\\NWtxtNoRef}")
                 output.write(".}\n")
-
             output.write("\\end{list}}\n")
-
         sys.stderr.write("generating the macro index took %.3gs.\n"
                          % (time.clock() - start))
 
@@ -964,7 +964,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 07b147e275ba $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 20e1a6325a61 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
@@ -1032,11 +1032,17 @@ def main():
                 elif len(replacement) == 1:
                     d.name = replacement[0]
 
+    start = time.clock()
+
     for d in document:
         d.generate_code()
-
     for f in files.values():
         f.close()
+
+    sys.stderr.write("generating the code took %.3gs.\n"
+                     % (time.clock() - start))
+
+    start = time.clock()
 
     doc = open(basename + ".tex", "w")
 
@@ -1069,6 +1075,9 @@ def main():
         d.generate_latex(doc)
 
     doc.close()
+
+    sys.stderr.write("generating the LaTeX took %.3gs overall.\n"
+                     % (time.clock() - start))
 
     if need_to_rerun:
         sys.stderr.write('Need to re-run nuweb.py after running latex.\n')
