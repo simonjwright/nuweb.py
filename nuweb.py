@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v 3baea15adb6e 2011/08/18 22:11:52 simonjwright $
+# $Id: nuweb.py,v a3b90a2bbbd9 2011/08/19 14:09:03 simonjwright $
 
 import getopt, re, tempfile, os, sys
 
@@ -434,7 +434,7 @@ class DocumentElement():
     elements."""
     def generate_code(self):
         pass
-    def generate_document(self, output):
+    def generate_latex(self, output):
         output.write(self.text)
     def matches(self, identifier):
         return False
@@ -575,7 +575,7 @@ class CodeElement(DocumentElement):
         for l in self.lines[1:]:
             l.write_code(stream, indent, parameters)
 
-    def generate_document(self, output):
+    def generate_latex(self, output):
         output.write("\\begin{flushleft} \\small\n")
         if not self.splittable:
             output.write("\\begin{minipage}{\\linewidth}")
@@ -761,6 +761,58 @@ class Fragment(CodeElement):
         which taken together define the whole fragment."""
         return [d for d in document if d.matches(self.name)]
 
+class Index(DocumentElement):
+    """Outputs an index."""
+
+    @staticmethod
+    def factory(id):
+        return {
+            'f' : lambda: FileIndex(),
+            'm' : lambda: MacroIndex(),
+            'u' : lambda: IdentifierIndex()
+            }[id]()
+
+    def generate_latex(self, output):
+        """The default is to output nothing."""
+        # XXX For development, display self.
+        print self
+        pass
+
+class FileIndex(Index):
+    """Outputs an index of all the files specified in the document,
+    with the elements that define them."""
+
+    def generate_latex(self, output):
+        files = {}
+        for d in document:
+            if isinstance(d, File):
+                value = files.get(d.name, [])
+                value.append(d)
+                files[d.name] = value
+        if len(files) > 0:
+            output.write("{\\small\\begin{list}{}{")
+            output.write("\\setlength{\\itemsep}{-\\parsep}")
+            output.write("\\setlength{\\itemindent}{-\\leftmargin}")
+            output.write("}\n")
+            for f in sorted(files.keys()):
+                output.write("\\item \\verb@\"%s\"@" % f)
+                output.write(" {\\footnotesize \\NWtxtDefBy\ ")
+                CodeElement.write_elements(output, files[f])
+                output.write(".}\n")
+            output.write("\\end{list}}\n")
+
+
+class MacroIndex(Index):
+
+    def generate_latex(self, output):
+        output.write("\n\nMacroIndex\n\n")
+
+
+class IdentifierIndex(Index):
+
+    def generate_latex(self, output):
+        output.write("\n\nIdentifierIndex\n\n")
+
 
 #-----------------------------------------------------------------------
 # Main
@@ -804,6 +856,14 @@ def read_nuweb(path):
             element_text = element_text + n.group('fragment')
             document.append(CodeElement.factory(element_text))
             latex_text = n.group('text')
+        elif re.match(r'\s*@[fmu]\s*', line):
+            # To be recognised, an index request needs to be on a line
+            # of its own.
+            # Save the LaTeX text
+            document.append(Text(latex_text))
+            latex_text = ""
+            n = re.match(r'\s*@(?P<index>[fmu])\s*', line)
+            document.append(Index.factory(n.group('index')))
         else:
             latex_text = latex_text + line
     # Save the last LaTeX text
@@ -858,7 +918,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 3baea15adb6e $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: a3b90a2bbbd9 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
@@ -960,7 +1020,7 @@ def main():
     define_macro (doc, "NWuseHyperlinks", "")
 
     for d in document:
-        d.generate_document(doc)
+        d.generate_latex(doc)
 
     doc.close()
 
