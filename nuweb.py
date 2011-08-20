@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 20e1a6325a61 2011/08/19 22:03:48 simonjwright $
+# $Id: nuweb.py,v 85069fd8d3f6 2011/08/20 20:44:00 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -92,7 +92,7 @@ class OutputCodeFile:
     doesn't already exist, or has changed, the new contents are
     written to it.
 
-    Also replaces @@ by @. (XXX haven't we done this already?)
+    Also replaces @@ by @.
 
     Also ensures that trailing white space is eliminated from all code
     output files. This is really just for neatness, but in the case of
@@ -115,6 +115,7 @@ class OutputCodeFile:
             self.buffer = self.buffer + text
     def close(self):
         if len(self.buffer) > 0:
+            # The '\n' ensures the buffer is flushed.
             self.write("\n")
         self.tempfile.seek(0)
         new_content = self.tempfile.readlines()
@@ -491,6 +492,10 @@ class CodeElement(DocumentElement):
     # code_elements.
     scrap_number = 1
 
+    def __lt__(self, other):
+        """Sort by scrap number."""
+        return self.scrap_number < other.scrap_number
+
     @staticmethod
     def factory(segment):
         """Given a segment of the document that corresponds to a File or
@@ -853,7 +858,56 @@ class IdentifierIndex(Index):
 
     def generate_latex(self, output):
         start = time.clock()
-        output.write("\n\nIdentifierIndex\n\n")
+
+        # 'definitions' is a dictionary keyed by identifier-text,
+        # whose values are lists of the CodeElements that define them.
+        definitions = {}
+
+        # 'users' is a dictionary keyed by itentifier-text, whose
+        # values are lists of the CodeElements that use them.
+        users = {}
+
+        for d in document:
+            if isinstance(d, CodeElement):
+                for usage in d.used_identifiers():
+
+                    identifier = usage[0]
+                    uses = usage[1]
+
+                    value = definitions.get(identifier, [])
+                    value.append(d)
+                    definitions[identifier] = value
+
+                    value = users.get(identifier, [])
+                    for u in uses:
+                        if not u in value:
+                            value.append(u)
+                    users[identifier] = value
+
+        if len(users) > len(definitions):
+            sys.stderr.write("more identifiers are used than are defined!\n")
+
+        if len(definitions) > 0:
+            output.write("{\\small\\begin{list}{}{")
+            output.write("\\setlength{\\itemsep}{-\\parsep}")
+            output.write("\\setlength{\\itemindent}{-\\leftmargin}")
+            output.write("}\n")
+
+            for i in sorted(definitions.keys()):
+                output.write("\\item \\verb@%s@" % i)
+                output.write(": defined in {\\footnotesize ")
+                CodeElement.write_elements(output, sorted(definitions[i]))
+                output.write("}, ");
+                if len(users[i]) > 0:
+                    output.write("used in {\\footnotesize ");
+                    CodeElement.write_elements(output, sorted(users[i]))
+                    output.write("}");
+                else:
+                    output.write("not used")
+                output.write(".\n");
+
+            output.write("\\end{list}}\n")
+
         sys.stderr.write("generating the identifier index took %.3gs.\n"
                          % (time.clock() - start))
 
@@ -964,7 +1018,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 20e1a6325a61 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 85069fd8d3f6 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
