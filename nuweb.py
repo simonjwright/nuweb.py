@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 41e64b6844bd 2011/08/21 11:40:00 simonjwright $
+# $Id: nuweb.py,v 62cb6f3a9dd3 2011/08/21 15:58:22 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -59,13 +59,13 @@ need_to_rerun = False
 
 class InputFile(file):
     """Supports iteration over an input file, eating all occurrences
-    of at-percent from the occurrence's position to the first
-    non-white-space character in the next line.
+    of at-percent (but not at-at-percent) from the occurrence's
+    position to the first non-white-space character in the next line.
 
     Because a commented-out line can appear to have zero length,
     end-of-file is indicated by the public instance variable
     'at_end'."""
-    at_percent_matcher = re.compile(r'(?m)@%.*$\s')
+    at_percent_matcher = re.compile(r'(?m)(?<!@)@%.*$\s')
     non_whitespace_matcher = re.compile(r'^\s*')
     def __init__(self, path, mode='r'):
         file.__init__(self, path, mode)
@@ -478,14 +478,15 @@ class CodeElement(DocumentElement):
     printed document (otherwise a minipage environment is used to
     prevent splitting)."""
 
-    # Matches a CodeEement for factory(). Take care not to terminate
-    # early on "@@}" (unusual, but occurs in nuweb.w).
+    # Matches a CodeEement for factory(). Take care not to recognise
+    # '@@|' or terminate early on "@@}" (unusual, but occurs in
+    # nuweb.w).
     element_matcher = re.compile(r'(?s)'
                                  + r'@(?P<kind>[oOdD])'
                                  + r'\s*'
                                  + r'(?P<name>.*?)'
                                  + r'@{(?P<text>.*?)'
-                                 + r'(@\|(?P<identifiers>.*))?'
+                                 + r'((?<!@)@\|(?P<identifiers>.*))?'
                                  + r'(?<!@)@}')
 
     # The scrap sequence number, used as the index (key) to
@@ -959,7 +960,7 @@ def read_nuweb(path):
             m = re.match(r'@i\s*(?P<filename>\S*)', line)
             read_nuweb(m.group('filename'))
         elif re.search(r'(?<!@)@[oOdD]', line):
-            m = re.match(r'(?P<text>.*)(?P<start>(?<!@)@[oOdD].*)', line)
+            m = re.match(r'(?s)(?P<text>.*)(?P<start>(?<!@)@[oOdD].*)', line)
             latex_text = latex_text + m.group('text')
             # Save the LaTeX text
             document.append(Text(latex_text))
@@ -1040,7 +1041,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 41e64b6844bd $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 62cb6f3a9dd3 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
