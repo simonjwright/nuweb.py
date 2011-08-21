@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 85069fd8d3f6 2011/08/20 20:44:00 simonjwright $
+# $Id: nuweb.py,v 41e64b6844bd 2011/08/21 11:40:00 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -140,7 +140,7 @@ class OutputCodeFile:
 
 
 #-----------------------------------------------------------------------
-# Fragment Name management (NOT PRESENTLY USED)
+# Fragment Name management (NOT PRESENTLY USED OR TESTED)
 #-----------------------------------------------------------------------
 
 class FragmentNames(dict):
@@ -775,6 +775,11 @@ class Fragment(CodeElement):
         which taken together define the whole fragment."""
         return [d for d in document if d.matches(self.name)]
 
+
+#-----------------------------------------------------------------------
+# Index class and children
+#-----------------------------------------------------------------------
+
 class Index(DocumentElement):
     """Outputs an index."""
 
@@ -798,26 +803,33 @@ class FileIndex(Index):
 
     def generate_latex(self, output):
         start = time.clock()
+
+        # 'files' is a dictionary keyed by file-name, whose values are
+        # lists of the CodeElements which define them.
         files = {}
+
         for d in document:
             if isinstance(d, File):
                 value = files.get(d.name, [])
                 value.append(d)
                 files[d.name] = value
+
         if len(files) > 0:
             output.write("{\\small\\begin{list}{}{")
             output.write("\\setlength{\\itemsep}{-\\parsep}")
             output.write("\\setlength{\\itemindent}{-\\leftmargin}")
             output.write("}\n")
+
             for f in sorted(files.keys()):
                 output.write("\\item \\verb@\"%s\"@" % f)
                 output.write(" {\\footnotesize \\NWtxtDefBy\ ")
                 CodeElement.write_elements(output, files[f])
                 output.write(".}\n")
+
             output.write("\\end{list}}\n")
+
         sys.stderr.write("generating the file index took %.3gs.\n"
                          % (time.clock() - start))
-
 
 class MacroIndex(Index):
     """Outputs an index of all the fragments in the docment, stating
@@ -825,23 +837,32 @@ class MacroIndex(Index):
 
     def generate_latex(self, output):
         start = time.clock()
+
+        # 'definitions' is a dictionary keyed by fragment-name,
+        # whose values are lists of the CodeElements that define them.
         definitions = {}
+
         for d in document:
             if isinstance(d, Fragment):
                 defs = definitions.get(d.name, [])
                 defs.append(d)
                 definitions[d.name] = defs
+
         if len(definitions) > 0:
             output.write("{\\small\\begin{list}{}{")
             output.write("\\setlength{\\itemsep}{-\\parsep}")
             output.write("\\setlength{\\itemindent}{-\\leftmargin}")
             output.write("}\n")
+
             for d in sorted(definitions.keys()):
                 output.write("\\item $\\langle\\,$%s\\nobreak\\ " % d)
                 output.write("{\\footnotesize ")
                 CodeElement.write_elements(output, definitions[d])
                 output.write("}$\\,\\rangle$ ")
                 output.write("{\\footnotesize ")
+
+                # 'uses' is a list of the CodeElements that reference
+                # this Fragment.
                 uses = definitions[d][0].referenced_in()
                 if len(uses) > 0:
                     output.write("{\\NWtxtRefIn} ")
@@ -849,10 +870,11 @@ class MacroIndex(Index):
                 else:
                     output.write("{\\NWtxtNoRef}")
                 output.write(".}\n")
+
             output.write("\\end{list}}\n")
+
         sys.stderr.write("generating the macro index took %.3gs.\n"
                          % (time.clock() - start))
-
 
 class IdentifierIndex(Index):
 
@@ -895,15 +917,15 @@ class IdentifierIndex(Index):
 
             for i in sorted(definitions.keys()):
                 output.write("\\item \\verb@%s@" % i)
-                output.write(": defined in {\\footnotesize ")
+                output.write(": {\\NWtxtIdentDefinedIn} {\\footnotesize ")
                 CodeElement.write_elements(output, sorted(definitions[i]))
                 output.write("}, ");
                 if len(users[i]) > 0:
-                    output.write("used in {\\footnotesize ");
+                    output.write("{\\NWtxtIdentUsedIn} {\\footnotesize ");
                     CodeElement.write_elements(output, sorted(users[i]))
                     output.write("}");
                 else:
-                    output.write("not used")
+                    output.write("{\\NWtxtIdentsNotUsed}")
                 output.write(".\n");
 
             output.write("\\end{list}}\n")
@@ -913,7 +935,7 @@ class IdentifierIndex(Index):
 
 
 #-----------------------------------------------------------------------
-# Main
+# Main and utilities
 #-----------------------------------------------------------------------
 
 def read_nuweb(path):
@@ -1018,7 +1040,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 85069fd8d3f6 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 41e64b6844bd $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
@@ -1118,9 +1140,11 @@ def main():
     define_macro (doc, "NWtxtRefIn", "Referenced in")
     define_macro (doc, "NWtxtNoRef", "Not referenced")
     define_macro (doc, "NWtxtFileDefBy", "File defined by")
-    define_macro (doc, "NWtxtIdentsUsed", "Uses:")
-    define_macro (doc, "NWtxtIdentsNotUsed", "never used")
+    define_macro (doc, "NWtxtIdentDefinedIn", "defined in")
+    define_macro (doc, "NWtxtIdentUsedIn", "used in")
     define_macro (doc, "NWtxtIdentsDefed", "Defines:")
+    define_macro (doc, "NWtxtIdentsNotUsed", "never used")
+    define_macro (doc, "NWtxtIdentsUsed", "Uses:")
     define_macro (doc, "NWsep", "${\\diamond}$")
     define_macro (doc, "NWnotglobal", "(not defined globally)")
     define_macro (doc, "NWuseHyperlinks", "")
