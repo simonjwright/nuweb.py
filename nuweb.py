@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 62cb6f3a9dd3 2011/08/21 15:58:22 simonjwright $
+# $Id: nuweb.py,v 2349fde9506b 2011/08/21 16:56:18 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -541,9 +541,13 @@ class CodeElement(DocumentElement):
             except:
                 # Ths happens if the page and scrap data hasn't been
                 # set up (probably because there's no .aux file, but
-                # maybe because it's too short).
-                new_page = 1
-                new_scrap = 'a'
+                # maybe because it's too short; perhaps (e.g.) there's
+                # nuweb code after the \end{document}).
+                global need_to_rerun
+                need_to_rerun = True
+                new_page = '?'
+                new_scrap = '?'
+                stream.write(", ")
             # Write the link target.
             stream.write("\\NWlink{nuweb%s%s}"
                          % (new_page, new_scrap))
@@ -624,20 +628,20 @@ class CodeElement(DocumentElement):
             def write_id_and_uses(i):
                 output.write("\\verb@%s@\\ " % i[0])
                 if len(i[1]) > 0:
-                    CodeElement.write_elements(output, i[1])
+                    CodeElement.write_elements(output, sorted(i[1]))
                 else:
                     output.write("\\NWtxtIdentsNotUsed")
 
             if len(defined_by) > 1:
                 output.write("\\item \\NWtxtMacroDefBy\\ ")
-                CodeElement.write_elements(output, defined_by)
+                CodeElement.write_elements(output, sorted(defined_by))
                 output.write(".\n")
 
             if isinstance(self, Fragment):
                 referenced_in = self.referenced_in()
                 if len(referenced_in) > 0:
                     output.write("\\item \\NWtxtMacroRefIn\\ ")
-                    CodeElement.write_elements(output, referenced_in)
+                    CodeElement.write_elements(output, sorted(referenced_in))
                     output.write(".\n")
                 else:
                     output.write("\\item \\NWtxtMacroNoRef.\n")
@@ -858,7 +862,7 @@ class MacroIndex(Index):
             for d in sorted(definitions.keys()):
                 output.write("\\item $\\langle\\,$%s\\nobreak\\ " % d)
                 output.write("{\\footnotesize ")
-                CodeElement.write_elements(output, definitions[d])
+                CodeElement.write_elements(output, sorted(definitions[d]))
                 output.write("}$\\,\\rangle$ ")
                 output.write("{\\footnotesize ")
 
@@ -867,7 +871,7 @@ class MacroIndex(Index):
                 uses = definitions[d][0].referenced_in()
                 if len(uses) > 0:
                     output.write("{\\NWtxtRefIn} ")
-                    CodeElement.write_elements(output, uses)
+                    CodeElement.write_elements(output, sorted(uses))
                 else:
                     output.write("{\\NWtxtNoRef}")
                 output.write(".}\n")
@@ -1041,7 +1045,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 62cb6f3a9dd3 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 2349fde9506b $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
