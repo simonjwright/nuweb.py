@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 2349fde9506b 2011/08/21 16:56:18 simonjwright $
+# $Id: nuweb.py,v 61b90f9e0665 2011/08/22 19:19:33 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -713,10 +713,7 @@ class CodeElement(DocumentElement):
                         value.append(c)
                         matches[i[0]] = value
                         break
-        result = []
-        for k in sorted(matches.keys()):
-            result.append([k, matches[k]])
-        return result
+        return [[k, matches[k]] for k in sorted(matches.keys())]
 
 class File(CodeElement):
     """Forms part of a named file. The whole file is composed of all
@@ -1045,7 +1042,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 2349fde9506b $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 61b90f9e0665 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
