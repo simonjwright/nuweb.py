@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 61b90f9e0665 2011/08/22 19:19:33 simonjwright $
+# $Id: nuweb.py,v 6dd2f7af73a1 2011/08/22 20:49:21 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -408,12 +408,12 @@ class NormalIdentifier(Identifier):
     """A NormalIdentifier consists of alphanumerics, underscore or
     period. It will match text that contains the match text supplied
     provided it isn't surrounded by any text that could itself form
-    part of a NormalIdentifier."""
+    part of a NormalIdentifier (except period)."""
 
     def __init__(self, match):
-        self.match = re.compile(r'(^|[^a-zA-Z0-9_.])' \
+        self.match = re.compile(r'(^|[^a-zA-Z0-9_])' \
                                     + match \
-                                    + r'($|[^a-zA-Z0-9_.])')
+                                    + r'($|[^a-zA-Z0-9_])')
 
     def matches(self, text):
         return re.search(self.match, text)
@@ -1042,7 +1042,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 61b90f9e0665 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 6dd2f7af73a1 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
