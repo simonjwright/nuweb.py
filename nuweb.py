@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 6dd2f7af73a1 2011/08/22 20:49:21 simonjwright $
+# $Id: nuweb.py,v 27a12c2cab33 2011/08/24 19:40:55 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -246,9 +246,6 @@ class CodeLine():
     def invokes(self, name):
         return False
 
-    def matches_identifier(self, identifier):
-        return False
-
 class LiteralCodeLine(CodeLine):
     """A line of code that contains text but no fragment invocations."""
 
@@ -274,9 +271,6 @@ class LiteralCodeLine(CodeLine):
         line = re.sub(r'^@#', '', line)
         stream.write("\\mbox{}\\verb@%s@\\\\\n"
                      % CodeLine.substitute_at_symbols(line))
-
-    def matches_identifier(self, identifier):
-        return identifier.matches(self.text)
 
 class InvocatingCodeLine(CodeLine):
     """A line of code that contains a fragment invocation."""
@@ -563,7 +557,9 @@ class CodeElement(DocumentElement):
             page = new_page
 
     def __init__(self, name, text, identifiers, splittable):
+
         self.name = name
+
         # We want to split into lines, retaining the \n at the end of
         # all lines that have one already (which may not include the
         # last, or only, line).
@@ -580,6 +576,12 @@ class CodeElement(DocumentElement):
         if len(text) > 0 and text[-1] == '\r':
             text = text[:-1]
         self.lines = [CodeLine.factory(l) for l in text.split("\r")]
+
+        # We keep the raw text (but only of LiteralLines) to speed up
+        # searching for identifiers.
+        self.literal_text = ''.join([l.text for l in self.lines
+                                     if isinstance(l, LiteralCodeLine)])
+
         self.identifiers = [[i, Identifier.factory(i)] for i in identifiers]
         self.splittable = splittable
         self.scrap_number = CodeElement.scrap_number
@@ -691,10 +693,8 @@ class CodeElement(DocumentElement):
         for i in self.identifiers:
             elements = []
             for c in code:
-                for l in c.lines:
-                    if l.matches_identifier(i[1]):
-                        elements.append(c)
-                        break
+                if i[1].matches(c.literal_text):
+                    elements.append(c)
             result.append([i[0], elements])
         return sorted(result)
 
@@ -707,12 +707,10 @@ class CodeElement(DocumentElement):
         matches = {}
         for c in code:
             for i in c.identifiers:
-                for l in self.lines:
-                    if l.matches_identifier(i[1]):
-                        value = matches.get(i[0], [])
-                        value.append(c)
-                        matches[i[0]] = value
-                        break
+                if i[1].matches(c.literal_text):
+                    value = matches.get(i[0], [])
+                    value.append(c)
+                    matches[i[0]] = value
         return [[k, matches[k]] for k in sorted(matches.keys())]
 
 class File(CodeElement):
@@ -1042,7 +1040,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 6dd2f7af73a1 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 27a12c2cab33 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
