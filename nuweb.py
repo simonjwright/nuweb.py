@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 27a12c2cab33 2011/08/24 19:40:55 simonjwright $
+# $Id: nuweb.py,v 3223aadbe2a2 2011/08/25 09:36:46 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -588,6 +588,10 @@ class CodeElement(DocumentElement):
         CodeElement.scrap_number = CodeElement.scrap_number + 1
         code_elements[self.scrap_number] = self
 
+    def __repr__(self):
+        """Provide a printable representation (only for debugging)."""
+        return "%s/%d" % (self.name, self.scrap_number)
+
     def write_code(self, stream, indent, parameters = []):
         """Output the code to 'stream', indenting all lines after the
         first by 'indent', and skipping the last line if it's
@@ -611,9 +615,11 @@ class CodeElement(DocumentElement):
         output.write("\\end{list}\n")
         output.write("\\vspace{-1ex}\n")
         defined_by = self.defined_by()
+        used_identifiers = self.used_identifiers()
         uses_identifiers = self.uses_identifiers()
         if len(defined_by) > 1 \
                 or isinstance(self, Fragment) \
+                or len(used_identifiers) > 0 \
                 or len(uses_identifiers) > 0:
             # We only create this list environment for the
             # crossreferences if there are any (otherwise, we'd have
@@ -647,14 +653,14 @@ class CodeElement(DocumentElement):
                     output.write(".\n")
                 else:
                     output.write("\\item \\NWtxtMacroNoRef.\n")
-                used_identifiers = self.used_identifiers()
-                if len(used_identifiers) > 0:
-                    output.write("\\item \\NWtxtIdentsDefed\\ ")
-                    for i in used_identifiers[:-1]:
-                        write_id_and_uses(i)
-                        output.write(", ")
-                    write_id_and_uses(used_identifiers[-1])
-                    output.write(".\\\\\n")
+
+            if len(used_identifiers) > 0:
+                output.write("\\item \\NWtxtIdentsDefed\\ ")
+                for i in used_identifiers[:-1]:
+                    write_id_and_uses(i)
+                    output.write(", ")
+                write_id_and_uses(used_identifiers[-1])
+                output.write(".\\\\\n")
 
             if len(uses_identifiers) > 0:
                 output.write("\\item \\NWtxtIdentsUsed\\ ")
@@ -707,7 +713,7 @@ class CodeElement(DocumentElement):
         matches = {}
         for c in code:
             for i in c.identifiers:
-                if i[1].matches(c.literal_text):
+                if i[1].matches(self.literal_text):
                     value = matches.get(i[0], [])
                     value.append(c)
                     matches[i[0]] = value
@@ -1040,7 +1046,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 27a12c2cab33 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 3223aadbe2a2 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
