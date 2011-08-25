@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 3223aadbe2a2 2011/08/25 09:36:46 simonjwright $
+# $Id: nuweb.py,v 75cc62eb2e16 2011/08/25 19:10:40 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -137,36 +137,6 @@ class OutputCodeFile:
             outfile.close()
         except:
             sys.stderr.write("unable to create output file %s.\n" % self.path)
-
-
-#-----------------------------------------------------------------------
-# Fragment Name management (NOT PRESENTLY USED OR TESTED)
-#-----------------------------------------------------------------------
-
-class FragmentNames(dict):
-    """Nuweb fragment names can be abbreviated (by ending with "..."),
-    in which case there is expected to be a matching full name (not
-    ending in "..."), either in the definition of a fragment or in an
-    invocation.
-
-    Fragment names are expanded fully in the LaTeX output.
-
-    The invocation may naturally appear first in the document, but the
-    processing order is to read the document (and discover the
-    fragments) before processing the fragment contents to generate
-    code."""
-    def __missing__(self, key):
-        if key[-3:] == "...":
-            for k in self.keys:
-                if k[:len(key)-3] == key[:-3]:
-                    self[key] = k
-                    return k
-            raise KeyError
-
-# In 'fragment_names' (which is a FragmentNames dictionary),
-# abbreviated keys (ending in "...") are only found if there's a
-# matching full definition.
-fragment_names = FragmentNames()
 
 
 #-----------------------------------------------------------------------
@@ -406,7 +376,7 @@ class NormalIdentifier(Identifier):
 
     def __init__(self, match):
         self.match = re.compile(r'(^|[^a-zA-Z0-9_])' \
-                                    + match \
+                                    + re.escape(match) \
                                     + r'($|[^a-zA-Z0-9_])')
 
     def matches(self, text):
@@ -419,7 +389,7 @@ class AbnormalIdentifier(Identifier):
     example, 'here$' would match a line containing 'there$')."""
 
     def __init__(self, match):
-        self.match = re.compile(match)
+        self.match = re.compile(re.escape(match))
 
     def matches(self, text):
         return re.search(self.match, text)
@@ -1046,7 +1016,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 3223aadbe2a2 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 75cc62eb2e16 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
