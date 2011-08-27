@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 75cc62eb2e16 2011/08/25 19:10:40 simonjwright $
+# $Id: nuweb.py,v f2293e2ce944 2011/08/27 16:25:26 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -184,19 +184,26 @@ class CodeLine():
         # Split at '@@' (later, we'll rejoin with '@').
         ss = str.split("@@")
 
-        # Un-escape @' etc. Parameters like '@1' must appear as
-        # themselves, which is slightly awkward because the LaTeX
-        # output is embedded in \verb@...@. Any @ we want to appear in
-        # the output is inserted by terminating the current \verb@
-        # environment, including a \verb|@|, and restarting the verb@
-        # environment.
+        # Un-escape @' etc.
+        #
+        # Parameters like '@1' must appear as themselves, which is
+        # slightly awkward because the LaTeX output is embedded in
+        # \verb@...@. Any @ we want to appear in the output is
+        # inserted by terminating the current \verb@ environment,
+        # including a \verb|@|, and restarting the verb@ environment.
         def subs(st):
-            for s in [["@'", "'"], ["@,", ","]]:
+            for s in [["@'", "'"], ["@,", ","], ["@#", ""]]:
                 st = st.replace(s[0], s[1])
             return st
         ss = [re.sub(r'@([1-9])',
                      r'@\\verb|@|\\verb@\1',
                      subs(s))
+              for s in ss]
+
+        # embolden text surrounded by '@_'.
+        ss = [re.sub(r'@_(.*?)@_',
+                     r'@\\hbox{\\sffamily\\bfseries \1}\\verb@',
+                     s)
               for s in ss]
 
         # Rejoin the string with a verbatim @.
@@ -235,12 +242,10 @@ class LiteralCodeLine(CodeLine):
 
     def write_latex(self, stream):
         """Writes self to 'stream' as LaTeX."""
-        # Remove leading '@#'.
-        # XXX more at-characters?
+        # Remove any trailing '\n' (XXX is this right?)
         line = re.sub(r'\n', '', self.text)
-        line = re.sub(r'^@#', '', line)
-        stream.write("\\mbox{}\\verb@%s@\\\\\n"
-                     % CodeLine.substitute_at_symbols(line))
+        line = CodeLine.substitute_at_symbols(line)
+        stream.write("\\mbox{}\\verb@%s@\\\\\n" % line)
 
 class InvocatingCodeLine(CodeLine):
     """A line of code that contains a fragment invocation."""
@@ -1016,7 +1021,7 @@ def main():
     global hyperlinks
 
     def usage():
-	sys.stderr.write('%s $Revision: 75cc62eb2e16 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: f2293e2ce944 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
