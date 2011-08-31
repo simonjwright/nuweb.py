@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v f2293e2ce944 2011/08/27 16:25:26 simonjwright $
+# $Id: nuweb.py,v 768de402bd27 2011/08/31 17:07:56 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -1020,20 +1020,24 @@ def main():
 
     global hyperlinks
 
+    generate_document = True
+
     def usage():
-	sys.stderr.write('%s $Revision: f2293e2ce944 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 768de402bd27 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
 			 + 'output this message\n')
 	sys.stderr.write('-r, --hyperlinks:        '
 			 + 'generate hyperlinks\n')
+	sys.stderr.write('-t, --no-tex:            '
+			 + 'don\'t generate the LaTeX output\n')
 
     try:
         opts, args = getopt.getopt\
 	    (sys.argv[1:],
-	     "hr",
-	     ["help", "hyperlinks", ])
+	     "hrt",
+	     ["help", "hyperlinks", "no-tex", ])
     except getopt.GetoptError:
         usage()
         sys.exit(1)
@@ -1044,6 +1048,8 @@ def main():
 	    sys.exit(0)
         elif o in ("-r", "--hyperlinks"):
             hyperlinks = True
+        elif o in ("-t", "--no-tex"):
+            generate_document = False
 
     if len(args) != 1:
         usage()
@@ -1058,7 +1064,8 @@ def main():
         basename = arg
 
     read_nuweb(input_filename)
-    read_aux(basename + '.aux')
+    if generate_document:
+        read_aux(basename + '.aux')
 
     # We need to resolve the abbreviated fragment references.
 
@@ -1098,6 +1105,9 @@ def main():
 
     sys.stderr.write("generating the code took %.3gs.\n"
                      % (time.clock() - start))
+
+    if not generate_document:
+        return
 
     start = time.clock()
 
