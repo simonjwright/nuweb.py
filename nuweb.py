@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 768de402bd27 2011/08/31 17:07:56 simonjwright $
+# $Id: nuweb.py,v 29538b7cdc40 2011/09/10 15:36:27 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -162,7 +162,7 @@ class CodeLine():
     @staticmethod
     def factory(line):
         if re.match(CodeLine.invocation_matcher, line):
-            return InvocatingCodeLine(line)
+            return InvokingCodeLine(line)
         else:
             return LiteralCodeLine(line)
 
@@ -175,7 +175,7 @@ class CodeLine():
         return l
 
     @staticmethod
-    def substitute_at_symbols(str):
+    def substitute_at_symbols_for_latex(str):
         """Unescape @' etc for LaTeX output."""
 
         # Remove double-at, so that the @@ in a substring like "@@,"
@@ -244,10 +244,10 @@ class LiteralCodeLine(CodeLine):
         """Writes self to 'stream' as LaTeX."""
         # Remove any trailing '\n' (XXX is this right?)
         line = re.sub(r'\n', '', self.text)
-        line = CodeLine.substitute_at_symbols(line)
+        line = CodeLine.substitute_at_symbols_for_latex(line)
         stream.write("\\mbox{}\\verb@%s@\\\\\n" % line)
 
-class InvocatingCodeLine(CodeLine):
+class InvokingCodeLine(CodeLine):
     """A line of code that contains a fragment invocation."""
     # XXX only one invocation! They may be nested!
 
@@ -317,7 +317,7 @@ class InvocatingCodeLine(CodeLine):
         # Check whether the invocation includes parameters, and
         # form the LaTeX text accordingly.
         if len(self.parameters) > 0:
-            parameters = [CodeLine.substitute_at_symbols(p)
+            parameters = [CodeLine.substitute_at_symbols_for_latex(p)
                           for p in self.parameters]
             text = r'{\it %s}\ (\verb@%s@)' % (self.name,
                                                ", ".join(parameters))
@@ -337,13 +337,14 @@ class InvocatingCodeLine(CodeLine):
         if len(elements) > 1:
             link = link + r',\ ...'
         # Reconstitute the line, making substitutions.
-        line = CodeLine.substitute_at_symbols(self.start) \
+        line = CodeLine.substitute_at_symbols_for_latex(self.start) \
             + r'@$\langle\,$' \
             + text \
             + r'\ ' \
             + link \
             + r'\,$\rangle\,$\verb@' \
-            + CodeLine.substitute_at_symbols(re.sub(r'\n', '', self.end))
+            + CodeLine.substitute_at_symbols_for_latex \
+                (re.sub(r'\n', '', self.end))
 
         # Output the line.
         stream.write("\\mbox{}\\verb@%s@\\\\\n" % line)
@@ -1023,7 +1024,7 @@ def main():
     generate_document = True
 
     def usage():
-	sys.stderr.write('%s $Revision: 768de402bd27 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 29538b7cdc40 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
