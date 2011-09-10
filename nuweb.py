@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 29538b7cdc40 2011/09/10 15:36:27 simonjwright $
+# $Id: nuweb.py,v c4743aa70b62 2011/09/10 17:27:59 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -161,6 +161,10 @@ class CodeLine():
 
     @staticmethod
     def factory(line):
+        # We know at this point that there are no \r's in the line, so
+        # it's safe to replace '@@' by '\r', thus avoiding any
+        # potential problems with eg @@<.
+        line = re.sub(r'@@', r'\r', line)
         if re.match(CodeLine.invocation_matcher, line):
             return InvokingCodeLine(line)
         else:
@@ -175,39 +179,47 @@ class CodeLine():
         return l
 
     @staticmethod
+    def substitute_at_symbols_for_code(str):
+        """Unescape @<char> for code output."""
+
+        # We don't have to handle '@(', '@,', '@1', which will have
+        # been processed as part of an invocation.
+
+        # At the moment, we just deal with the emboldening indication
+        # '@_'.
+
+        # @-sequences with simple substitutions:
+        for s in [["@_", ""]]:
+            str = str.replace(s[0], s[1])
+
+        # Replace the '@@' marker '\r' with a single '@'
+        str = str.replace('\r', '@')
+
+        return str
+
+    @staticmethod
     def substitute_at_symbols_for_latex(str):
         """Unescape @' etc for LaTeX output."""
 
-        # Remove double-at, so that the @@ in a substring like "@@,"
-        # doesn't remain live and cause the substring to get treated
-        # as "@,".
-        # Split at '@@' (later, we'll rejoin with '@').
-        ss = str.split("@@")
-
         # Un-escape @' etc.
-        #
+        for s in [["@'", "'"], ["@,", ","], ["@#", ""]]:
+            str = str.replace(s[0], s[1])
+
         # Parameters like '@1' must appear as themselves, which is
         # slightly awkward because the LaTeX output is embedded in
         # \verb@...@. Any @ we want to appear in the output is
         # inserted by terminating the current \verb@ environment,
         # including a \verb|@|, and restarting the verb@ environment.
-        def subs(st):
-            for s in [["@'", "'"], ["@,", ","], ["@#", ""]]:
-                st = st.replace(s[0], s[1])
-            return st
-        ss = [re.sub(r'@([1-9])',
-                     r'@\\verb|@|\\verb@\1',
-                     subs(s))
-              for s in ss]
+        str = re.sub(r'@([1-9])', r'@\\verb|@|\\verb@\1', str)
 
         # embolden text surrounded by '@_'.
-        ss = [re.sub(r'@_(.*?)@_',
+        str = re.sub(r'@_(.*?)@_',
                      r'@\\hbox{\\sffamily\\bfseries \1}\\verb@',
-                     s)
-              for s in ss]
+                     str)
 
-        # Rejoin the string with a verbatim @.
-        str = r'@\verb|@|\verb@'.join(ss)
+        # Replace any '\r' markers by a single '@' (see above for why
+        # this is a bit tricky)
+        str = re.sub(r'\r', r'@\\verb|@|\\verb@', str)
 
         return str
 
@@ -233,23 +245,23 @@ class LiteralCodeLine(CodeLine):
         """Writes self to 'stream' as code, indented by 'indent', with
         substitution of 'parameters'."""
         # '@#' (at the start of the text) means don't indent.
-        # XXX more at-characters?
         text = CodeLine.substitute_parameters(self.text, parameters)
         if re.match(r'@#', text):
             text = text[2:]
             indent = ""
+        text = CodeLine.substitute_at_symbols_for_code(text)
         stream.write("%s%s" % (indent, text))
 
     def write_latex(self, stream):
         """Writes self to 'stream' as LaTeX."""
         # Remove any trailing '\n' (XXX is this right?)
-        line = re.sub(r'\n', '', self.text)
-        line = CodeLine.substitute_at_symbols_for_latex(line)
-        stream.write("\\mbox{}\\verb@%s@\\\\\n" % line)
+        text = re.sub(r'\n', '', self.text)
+        text = CodeLine.substitute_at_symbols_for_latex(text)
+        stream.write("\\mbox{}\\verb@%s@\\\\\n" % text)
 
 class InvokingCodeLine(CodeLine):
     """A line of code that contains a fragment invocation."""
-    # XXX only one invocation! They may be nested!
+    # XXX only one invocation! They might be nested!
 
     def __init__(self, line):
         m = re.match(CodeLine.invocation_matcher, line)
@@ -268,13 +280,15 @@ class InvokingCodeLine(CodeLine):
 
     def write_code(self, stream, indent, parameters):
         """Writes self to 'stream' as code, indented by 'indent'."""
-        stream.write("%s%s" % (indent, self.start))
+        start = CodeLine.substitute_at_symbols_for_code(self.start)
+        end = CodeLine.substitute_at_symbols_for_code(self.end)
+        stream.write("%s%s" % (indent, start))
         params = [CodeLine.substitute_parameters(p, parameters)
                   for p in self.parameters]
         # Note the indent needed for the fragments (where we are now;
         # the input indent was where we began, and we've now added the
         # characters in the self.start sequence).
-        new_indent = indent +  re.sub(r'\S', ' ', self.start).expandtabs()
+        new_indent = indent +  re.sub(r'\S', ' ', start).expandtabs()
         fragments = [d for d in document if d.matches(self.name)]
         # Fix up abbreviated names in the invocation.
         # XXX Fixing up stuff on the fly probably doesn't help the
@@ -293,7 +307,7 @@ class InvokingCodeLine(CodeLine):
                 # there'll only be ome matching fragment.
                 stream.write(new_indent)
                 f.write_code(stream, new_indent, params)
-        stream.write(self.end)
+        stream.write(end)
 
     def write_latex(self, stream):
         """Writes self to 'stream' as LaTeX."""
@@ -1024,7 +1038,7 @@ def main():
     generate_document = True
 
     def usage():
-	sys.stderr.write('%s $Revision: 29538b7cdc40 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: c4743aa70b62 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
@@ -1096,6 +1110,12 @@ def main():
                     sys.exit(1)
                 elif len(replacement) == 1:
                     d.name = replacement[0]
+
+    # Nuweb has a flag -o which suppresses code output. This
+    # implementation handles some processing (expansion of abbreviated
+    # fragment references) on the fly during code generation, so that
+    # feature has been omitted. In any case, code generation is much
+    # quicker than document generation, so the gain would be minimal.
 
     start = time.clock()
 
