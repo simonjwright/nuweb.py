@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v c4743aa70b62 2011/09/10 17:27:59 simonjwright $
+# $Id: nuweb.py,v 1ae4d79f6c40 2011/09/14 19:21:34 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -156,7 +156,7 @@ class CodeLine():
                                     + r'(?P<invocation>.*?)'
                                     + r'@>'
                                     + r'(?P<end>.*)')
-    parameter_matcher = re.compile(r'(?P<name>.*)'
+    parameter_matcher = re.compile(r'(?P<fragment>.*)'
                                    + r'(@\((?P<parameters>.*)@\))')
 
     @staticmethod
@@ -232,7 +232,9 @@ class CodeLine():
         """Writes self to 'stream' as LaTeX. To be overridden."""
         pass
 
-    def invokes(self, name):
+    def invokes(self, candidate):
+        """Returns True if the CodeLine invokes the fragment
+        'candidate'."""
         return False
 
 class LiteralCodeLine(CodeLine):
@@ -261,20 +263,20 @@ class LiteralCodeLine(CodeLine):
 
 class InvokingCodeLine(CodeLine):
     """A line of code that contains a fragment invocation."""
-    # XXX only one invocation! They might be nested!
+    # XXX only supports one invocation! They might be nested!
 
     def __init__(self, line):
         m = re.match(CodeLine.invocation_matcher, line)
-        name = m.group('invocation').strip()
-        n = re.match(CodeLine.parameter_matcher, name)
-        if n:
-            name = n.group('name').strip()
+        fragment = m.group('invocation').strip()
+        p = re.match(CodeLine.parameter_matcher, fragment)
+        if p:
+            fragment = p.group('fragment').strip()
             parameters = re.split(r'\s*@,\s*',
-                                  n.group('parameters').strip())
+                                  p.group('parameters').strip())
         else:
             parameters = []
         self.start = m.group('start')
-        self.name = name
+        self.fragment = fragment
         self.parameters = parameters
         self.end = m.group('end')
 
@@ -289,15 +291,15 @@ class InvokingCodeLine(CodeLine):
         # the input indent was where we began, and we've now added the
         # characters in the self.start sequence).
         new_indent = indent +  re.sub(r'\S', ' ', start).expandtabs()
-        fragments = [d for d in document if d.matches(self.name)]
+        fragments = [d for d in document if d.matches(self.fragment)]
         # Fix up abbreviated names in the invocation.
         # XXX Fixing up stuff on the fly probably doesn't help the
         # XXX reader's understanding!
         for f in fragments:
-            if len(f.name) > len(self.name):
-                self.name = f.name
+            if len(f.name) > len(self.fragment):
+                self.fragment = f.name
         if len(fragments) == 0:
-            sys.stderr.write("no fragments matching '%s'.\n" % self.name)
+            sys.stderr.write("no fragments matching '%s'.\n" % self.fragment)
         else:
             fragments[0].write_code(stream, new_indent, params)
             for f in fragments[1:]:
@@ -333,12 +335,12 @@ class InvokingCodeLine(CodeLine):
         if len(self.parameters) > 0:
             parameters = [CodeLine.substitute_at_symbols_for_latex(p)
                           for p in self.parameters]
-            text = r'{\it %s}\ (\verb@%s@)' % (self.name,
+            text = r'{\it %s}\ (\verb@%s@)' % (self.fragment,
                                                ", ".join(parameters))
         else:
-            text = r'{\it %s}' % self.name
+            text = r'{\it %s}' % self.fragment
         # Find all the elements with the invoked name
-        elements = [e for e in document if e.matches(self.name)]
+        elements = [e for e in document if e.matches(self.fragment)]
         if len(elements) > 0:
             e = elements[0]
             try:
@@ -363,10 +365,12 @@ class InvokingCodeLine(CodeLine):
         # Output the line.
         stream.write("\\mbox{}\\verb@%s@\\\\\n" % line)
 
-    def invokes(self, name):
+    def invokes(self, candidate):
+        """Returns True if the InvokingCodeLine invokes the fragment
+        'candidate'."""
         # XXX Need some 'matches' logic here (though perhaps we should
         # expand all fragment names in an earlier pass???)
-        return name == self.name
+        return candidate == self.fragment
 
 
 #-----------------------------------------------------------------------
@@ -1038,7 +1042,7 @@ def main():
     generate_document = True
 
     def usage():
-	sys.stderr.write('%s $Revision: c4743aa70b62 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 1ae4d79f6c40 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
