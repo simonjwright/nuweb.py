@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 1ae4d79f6c40 2011/09/14 19:21:34 simonjwright $
+# $Id: nuweb.py,v 98662d5d6200 2011/09/14 19:23:39 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -92,8 +92,6 @@ class OutputCodeFile:
     doesn't already exist, or has changed, the new contents are
     written to it.
 
-    Also replaces @@ by @.
-
     Also ensures that trailing white space is eliminated from all code
     output files. This is really just for neatness, but in the case of
     GCC Ada, the standard style checks (-gnaty) warn about trailing
@@ -107,7 +105,7 @@ class OutputCodeFile:
         nl = text.find("\n")
         if nl >= 0:
             self.tempfile.write\
-                ((self.buffer + text[:nl]).replace("@@", "@").rstrip())
+                ((self.buffer + text[:nl]).rstrip())
             self.tempfile.write("\n")
             self.buffer = ''
             self.write(text[nl + 1:])
@@ -1042,7 +1040,7 @@ def main():
     generate_document = True
 
     def usage():
-	sys.stderr.write('%s $Revision: 1ae4d79f6c40 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 98662d5d6200 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
