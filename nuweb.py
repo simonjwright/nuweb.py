@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 98662d5d6200 2011/09/14 19:23:39 simonjwright $
+# $Id: nuweb.py,v 53060d4933de 2011/09/14 20:04:20 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -212,7 +212,7 @@ class CodeLine():
 
         # embolden text surrounded by '@_'.
         str = re.sub(r'@_(.*?)@_',
-                     r'@\\hbox{\\sffamily\\bfseries \1}\\verb@',
+                     r'@{\\sffamily\\bfseries \1}\\verb@',
                      str)
 
         # Replace any '\r' markers by a single '@' (see above for why
@@ -1040,7 +1040,7 @@ def main():
     generate_document = True
 
     def usage():
-	sys.stderr.write('%s $Revision: 98662d5d6200 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 53060d4933de $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
