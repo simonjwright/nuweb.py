@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 53060d4933de 2011/09/14 20:04:20 simonjwright $
+# $Id: nuweb.py,v 33d2580649bb 2011/09/30 22:23:05 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -333,10 +333,10 @@ class InvokingCodeLine(CodeLine):
         if len(self.parameters) > 0:
             parameters = [CodeLine.substitute_at_symbols_for_latex(p)
                           for p in self.parameters]
-            text = r'{\it %s}\ (\verb@%s@)' % (self.fragment,
-                                               ", ".join(parameters))
+            text = r'\textit{%s}\ (\verb@%s@)' % (self.fragment,
+                                                  ", ".join(parameters))
         else:
-            text = r'{\it %s}' % self.fragment
+            text = r'\textit{%s}' % self.fragment
         # Find all the elements with the invoked name
         elements = [e for e in document if e.matches(self.fragment)]
         if len(elements) > 0:
@@ -764,7 +764,7 @@ class Fragment(CodeElement):
             link = "%s%s" % (self.page_number, self.scrap_on_page)
         except:
             link = "??"
-        output.write("\\NWtarget{nuweb%s}{}$\\langle\\,${\\it %s}"
+        output.write("\\NWtarget{nuweb%s}{}$\\langle\\,$\\textit{%s}"
                      "\\nobreak\\ {\\footnotesize{%s}}$\\,\\rangle\\equiv$\n"
                      % (link, self.name, link))
 
@@ -1040,7 +1040,7 @@ def main():
     generate_document = True
 
     def usage():
-	sys.stderr.write('%s $Revision: 53060d4933de $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 33d2580649bb $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
