@@ -13,7 +13,7 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v 1d2874647acf 2011/10/04 19:42:35 simonjwright $
+# $Id: nuweb.py,v f077dc0de1a7 2011/10/11 15:06:00 simonjwright $
 
 import getopt, os, re, sys, tempfile, time
 
@@ -457,12 +457,19 @@ class Text(DocumentElement):
 class CodeElement(DocumentElement):
     """May be a File or a Fragment.
 
-    'name' is either the file name or the definition name.  'text' is
-    the code content.  'identifiers' is a list of the identifiers
-    defined by the element [[text, match]].  'splittable' is True if
-    the text is allowed to be split over a page boundary in the
-    printed document (otherwise a minipage environment is used to
-    prevent splitting)."""
+    'name' is either the file name or the definition name.
+
+    'lines' is the code (scrap) content, which is a list of CodeLines.
+
+    'identifiers' is a list of the identifiers defined by the element
+    expressed as [[identifier-text, Identifier]].
+
+    'literal_text' is the joined content of the LiteralLines (to speed
+    up identifier search).
+
+    'splittable' is True if the text is allowed to be split over a
+    page boundary in the printed document (otherwise a minipage
+    environment is used to prevent splitting)."""
 
     # Matches a CodeEement for factory(). Take care not to recognise
     # '@@|' or terminate early on "@@}" (unusual, but occurs in
@@ -549,16 +556,19 @@ class CodeElement(DocumentElement):
             page = new_page
 
     def __init__(self, name, text, identifiers, splittable):
+        """'name' is either the file name or the fragment name.
+        'text' is the code (scrap) content.
+        'identifiers' is a list of the identifiers defined by the scrap.
+        'splittable' is True if the text is allowed to be printed over
+        a page boundary in the printed document."""
 
         self.name = name
 
         # We want to split into lines, retaining the \n at the end of
         # all lines that have one already (which may not include the
         # last, or only, line).
-
         # We do this by making sure that all line terminators are \n\r
         # (NB, not the normal order) and splitting on \r.
-
         # We rely on Python to generate \r\n on output if required.
         text = re.sub(r'\r', '', text)
         text = re.sub(r'\n', r'\n\r', text)
@@ -1040,7 +1050,7 @@ def main():
     generate_document = True
 
     def usage():
-	sys.stderr.write('%s $Revision: 1d2874647acf $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: f077dc0de1a7 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
