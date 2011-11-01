@@ -13,9 +13,10 @@
 #  License distributed with this package; see file COPYING.  If not,
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
-# $Id: nuweb.py,v f077dc0de1a7 2011/10/11 15:06:00 simonjwright $
 
-import getopt, os, re, sys, tempfile, time
+# $Id: nuweb.py,v a8d19f2ad982 2011/11/01 17:35:57 simonjwright $
+
+import getopt, re, sys, tempfile, time
 
 
 #-----------------------------------------------------------------------
@@ -65,14 +66,17 @@ class InputFile(file):
     Because a commented-out line can appear to have zero length,
     end-of-file is indicated by the public instance variable
     'at_end'."""
+
     at_percent_matcher = re.compile(r'(?m)(?<!@)@%.*$\s')
     non_whitespace_matcher = re.compile(r'^\s*')
+
     def __init__(self, path, mode='r'):
         file.__init__(self, path, mode)
         self.at_end = False
         self.line_number = 0
         self.path = path
         self.skipping_after_at_percent = False
+
     def readline(self):
         l = file.readline(self)
         self.at_end = len(l) == 0
@@ -97,20 +101,22 @@ class OutputCodeFile:
     GCC Ada, the standard style checks (-gnaty) warn about trailing
     white space (which, incidentally, includes non-zero-length blank
     lines)."""
+
     def __init__(self, path):
         self.path = path
         self.tempfile = tempfile.TemporaryFile(dir=".", prefix="nw")
         self.buffer = ''
+
     def write(self, text):
         nl = text.find("\n")
         if nl >= 0:
-            self.tempfile.write\
-                ((self.buffer + text[:nl]).rstrip())
+            self.tempfile.write((self.buffer + text[:nl]).rstrip())
             self.tempfile.write("\n")
             self.buffer = ''
             self.write(text[nl + 1:])
         else:
             self.buffer = self.buffer + text
+
     def close(self):
         if len(self.buffer) > 0:
             # The '\n' ensures the buffer is flushed.
@@ -386,8 +392,8 @@ class Identifier():
             return AbnormalIdentifier(match)
 
     def matches(self, text):
-        """'line' is a code line (or, for a parameterised , a
-        parameter)."""
+        """'line' is a code line (or, for a parameterised invocation,
+        a parameter)."""
         return False
 
 class NormalIdentifier(Identifier):
@@ -1027,7 +1033,11 @@ def read_aux(path):
     page = -1  # impossible value
 
     for l in input:
-        m = re.match(r'\\newlabel{scrap(?P<scrap>\d+)}{{.*}{(?P<page>\d+)}', l)
+        # Be explicit about the expected format; the memoir
+        # documentclass has a complicated form with nested braces for
+        # the {} section before the page number.
+        m = re.match(r'\\newlabel{scrap(?P<scrap>\d+)}{{.*}{(?P<page>\d+)}'
+                     + r'{.*}{.*}{.*}}', l)
         if m:
             scrap = int(m.group('scrap'))
             p = m.group('page')
@@ -1050,7 +1060,7 @@ def main():
     generate_document = True
 
     def usage():
-	sys.stderr.write('%s $Revision: f077dc0de1a7 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: a8d19f2ad982 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
