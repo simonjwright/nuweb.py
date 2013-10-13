@@ -1,3 +1,15 @@
+************
+* 20131013 *
+************
+
+Fixed bug 2 (see [1]) - (Hyperlinks always include the letter).
+
+[1] https://sourceforge.net/p/nuweb/nuweb-py/tickets/2/
+
+************
+* 20130419 *
+************
+
 I've been frustrated by trying to fix problems in nuweb[1]. It can be
 really hard to work out how to make a change - for example, how to fix
 bug 2965157[2] - if it is indeed a bug!
@@ -13,9 +25,6 @@ to the intention.
 As another problem (far from the only one!), what is a block comment?
 
 Anyway, to scratch this itch I've been reworking nuweb in Python.
-
-There are no files to download yet, but you can access the code
-repository ubder the Code tab.
 
 So far, the parts implemented are:
 
