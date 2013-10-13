@@ -14,7 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v ce6dadaa8ab9 2013/10/13 10:41:51 simonjwright $
+# $Id: nuweb.py,v dd452e493262 2013/10/13 10:59:38 simonjwright $
 
 import getopt, re, sys, tempfile, time
 
@@ -1060,7 +1060,7 @@ def main():
     generate_document = True
 
     def usage():
-	sys.stderr.write('%s $Revision: ce6dadaa8ab9 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: dd452e493262 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
@@ -1161,9 +1161,9 @@ def main():
     try:
         for j, c in enumerate(code):
             if c.scrap_on_page == 'a':
-                if j + 1 == len(code):
-                    c.scrap_on_page = ''
-                elif c.page_number != code[j + 1].page_number:
+                # NB short-circuit evaluation
+                if (j + 1 == len(code)
+                    or c.page_number != code[j + 1].page_number):
                     c.scrap_on_page = ''
     except:
         pass
