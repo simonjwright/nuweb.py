@@ -14,10 +14,7 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-# $Id: nuweb.py,v dd452e493262 2013/10/13 10:59:38 simonjwright $
-
 import getopt, re, sys, tempfile, time
-
 
 #-----------------------------------------------------------------------
 # Notes
@@ -61,31 +58,24 @@ need_to_rerun = False
 class InputFile(file):
     """Supports iteration over an input file, eating all occurrences
     of at-percent (but not at-at-percent) from the occurrence's
-    position to the first non-white-space character in the next line.
+    position to the newline (or end-of-file).
 
     Because a commented-out line can appear to have zero length,
     end-of-file is indicated by the public instance variable
     'at_end'."""
 
-    at_percent_matcher = re.compile(r'(?m)(?<!@)@%.*$\s')
-    non_whitespace_matcher = re.compile(r'^\s*')
+    at_percent_matcher = re.compile(r'(?s)(?<!@)@%.*$')
 
     def __init__(self, path, mode='r'):
         file.__init__(self, path, mode)
         self.at_end = False
         self.line_number = 0
         self.path = path
-        self.skipping_after_at_percent = False
 
     def readline(self):
         l = file.readline(self)
         self.at_end = len(l) == 0
         self.line_number = self.line_number + 1
-        if self.skipping_after_at_percent:
-            self.skipping_after_at_percent = False
-            l = re.sub(InputFile.non_whitespace_matcher, '', l)
-        if re.search(InputFile.at_percent_matcher, l):
-            self.skipping_after_at_percent = True
         return re.sub(InputFile.at_percent_matcher, '', l)
 
 class OutputCodeFile:
@@ -1060,7 +1050,7 @@ def main():
     generate_document = True
 
     def usage():
-	sys.stderr.write('%s $Revision: dd452e493262 $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: df537b5ea89e $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
