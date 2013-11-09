@@ -1,4 +1,12 @@
 ************
+* 2013mmdd *
+************
+
+Fixed bug 3 (see [1]) - (@% eats leading white space).
+
+[1] https://sourceforge.net/p/nuweb/nuweb-py/tickets/3/
+
+************
 * 20131013 *
 ************
 
