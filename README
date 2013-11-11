@@ -4,7 +4,10 @@
 
 Fixed bug 3 (see [1]) - (@% eats leading white space).
 
+Fixed bug 4 (see [2]) - (Multiple definitions shouldn't appear as uses).
+
 [1] https://sourceforge.net/p/nuweb/nuweb-py/tickets/3/
+[2] https://sourceforge.net/p/nuweb/nuweb-py/tickets/4/
 
 ************
 * 20131013 *

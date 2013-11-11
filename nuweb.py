@@ -690,32 +690,41 @@ class CodeElement(DocumentElement):
 
     def used_identifiers(self):
         """Returns a list of the identifier definitions made by this
-        CodeElement and their users: [[identifier-text, [element]]]."""
+        CodeElement and their users (except for those that also define
+        the identifier): [[identifier-text, [element]]]."""
         code = [c for c in document
                 if isinstance(c, CodeElement) and c != self]
         result = []
         for i in self.identifiers:
             elements = []
             for c in code:
-                if i[1].matches(c.literal_text):
+                if i[1].matches(c.literal_text) \
+                   and not c.defines_identifier(i[0]):
                     elements.append(c)
             result.append([i[0], elements])
         return sorted(result)
 
     def uses_identifiers(self):
-        """Returns a list of all the identifier definitions made by
-        other CodeElements and used in this one:
-        [[identifier-text, [element]]]."""
+        """Returns a list of all the identifier definitions made by other
+        CodeElements and used in this one (except those that are also
+        defined in this one): [[identifier-text, [element]]]."""
         code = [c for c in document
                 if isinstance(c, CodeElement) and c != self]
         matches = {}
         for c in code:
             for i in c.identifiers:
-                if i[1].matches(self.literal_text):
+                if i[1].matches(self.literal_text) \
+                   and not self.defines_identifier(i[0]):
                     value = matches.get(i[0], [])
                     value.append(c)
                     matches[i[0]] = value
         return [[k, matches[k]] for k in sorted(matches.keys())]
+
+    def defines_identifier(self, id):
+        """Return True if the Element defines the identifier id."""
+        for i in self.identifiers:
+            if id == i[0]: return True
+        return False
 
 class File(CodeElement):
     """Forms part of a named file. The whole file is composed of all
@@ -889,7 +898,7 @@ class IdentifierIndex(Index):
         # whose values are lists of the CodeElements that define them.
         definitions = {}
 
-        # 'users' is a dictionary keyed by itentifier-text, whose
+        # 'users' is a dictionary keyed by identifier-text, whose
         # values are lists of the CodeElements that use them.
         users = {}
 
@@ -1050,7 +1059,7 @@ def main():
     generate_document = True
 
     def usage():
-	sys.stderr.write('%s $Revision: df537b5ea89e $\n' % sys.argv[0])
+	sys.stderr.write('%s $Revision: 8a3bacdfb376 $\n' % sys.argv[0])
 	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
 	sys.stderr.write('flags:\n')
 	sys.stderr.write('-h, --help:              '
