@@ -14,20 +14,24 @@
 #  write to the Free Software Foundation, 59 Temple Place - Suite
 #  330, Boston, MA 02111-1307, USA.
 
-import getopt, re, sys, tempfile, time
+import getopt
+import re
+import sys
+import tempfile
+import time
 
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Notes
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 # Makes considerable use of Python's extensions to regular
 # expressions, see http://docs.python.org/library/re.html. For
 # example, including (?s) in an RE is equivalent to the flag
 # re.DOTALL, which allows "." to match \n (newline).
 
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Globals
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 # In 'document', we have the input document as a sequence of
 # DocumentElements.
@@ -47,13 +51,14 @@ files = {}
 hyperlinks = False
 
 # 'need_to_rerun', if True, means we end with a message telling the
-# user she needs to re-run nuweb.py after running LaTeX (because of a
+# user they need to re-run nuweb.py after running LaTeX (because of a
 # scrap number mismatch).
 need_to_rerun = False
 
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Nuweb file i/o
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
+
 
 class InputFile(file):
     """Supports iteration over an input file, eating all occurrences
@@ -77,6 +82,7 @@ class InputFile(file):
         self.at_end = len(l) == 0
         self.line_number = self.line_number + 1
         return re.sub(InputFile.at_percent_matcher, '', l)
+
 
 class OutputCodeFile:
     """The contents are written to a temporary file (nw* in the
@@ -119,12 +125,12 @@ class OutputCodeFile:
             current_content = outfile.readlines()
             outfile.close()
             if new_content == current_content:
-                #sys.stderr.write("output file %s unchanged.\n" % self.path)
+                # sys.stderr.write("output file %s unchanged.\n" % self.path)
                 return
             else:
                 sys.stderr.write("output file %s has changed.\n" % self.path)
         except:
-            sys.stderr.write("creating output file %s.\n" % self.path);
+            sys.stderr.write("creating output file %s.\n" % self.path)
         try:
             outfile = open(self.path, "w")
             outfile.writelines(new_content)
@@ -133,9 +139,9 @@ class OutputCodeFile:
             sys.stderr.write("unable to create output file %s.\n" % self.path)
 
 
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # CodeLine class and children
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 class CodeLine():
     """A CodeLine is a line of code text from a File or Fragment,
@@ -231,6 +237,7 @@ class CodeLine():
         'candidate'."""
         return False
 
+
 class LiteralCodeLine(CodeLine):
     """A line of code that contains text but no fragment invocations."""
 
@@ -254,6 +261,7 @@ class LiteralCodeLine(CodeLine):
         text = re.sub(r'\n', '', self.text)
         text = CodeLine.substitute_at_symbols_for_latex(text)
         stream.write("\\mbox{}\\verb@%s@\\\\\n" % text)
+
 
 class InvokingCodeLine(CodeLine):
     """A line of code that contains a fragment invocation."""
@@ -284,7 +292,7 @@ class InvokingCodeLine(CodeLine):
         # Note the indent needed for the fragments (where we are now;
         # the input indent was where we began, and we've now added the
         # characters in the self.start sequence).
-        new_indent = indent +  re.sub(r'\S', ' ', start).expandtabs()
+        new_indent = indent + re.sub(r'\S', ' ', start).expandtabs()
         fragments = [d for d in document if d.matches(self.fragment)]
         # Fix up abbreviated names in the invocation.
         # XXX Fixing up stuff on the fly probably doesn't help the
@@ -353,8 +361,8 @@ class InvokingCodeLine(CodeLine):
             + r'\ ' \
             + link \
             + r'\,$\rangle\,$\verb@' \
-            + CodeLine.substitute_at_symbols_for_latex \
-                (re.sub(r'\n', '', self.end))
+            + CodeLine.substitute_at_symbols_for_latex(
+                re.sub(r'\n', '', self.end))
 
         # Output the line.
         stream.write("\\mbox{}\\verb@%s@\\\\\n" % line)
@@ -367,9 +375,9 @@ class InvokingCodeLine(CodeLine):
         return candidate == self.fragment
 
 
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Identifier class and children
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 class Identifier():
     """The abstract root of the user-defined identifier classes."""
@@ -386,6 +394,7 @@ class Identifier():
         a parameter)."""
         return False
 
+
 class NormalIdentifier(Identifier):
     """A NormalIdentifier consists of alphanumerics, underscore or
     period. It will match text that contains the match text supplied
@@ -393,12 +402,13 @@ class NormalIdentifier(Identifier):
     part of a NormalIdentifier (except period)."""
 
     def __init__(self, match):
-        self.match = re.compile(r'(^|[^a-zA-Z0-9_])' \
-                                    + re.escape(match) \
-                                    + r'($|[^a-zA-Z0-9_])')
+        self.match = re.compile(r'(^|[^a-zA-Z0-9_])'
+                                + re.escape(match)
+                                + r'($|[^a-zA-Z0-9_])')
 
     def matches(self, text):
         return re.search(self.match, text)
+
 
 class AbnormalIdentifier(Identifier):
     """An AbnormalIdentifier contains at least one character that
@@ -413,9 +423,9 @@ class AbnormalIdentifier(Identifier):
         return re.search(self.match, text)
 
 
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # DocumentElement class and children
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 class DocumentElement():
     """The abstract root of the element classes that make up the
@@ -423,32 +433,40 @@ class DocumentElement():
     elements."""
     def generate_code(self):
         pass
+
     def generate_latex(self, output):
         output.write(self.text)
+
     def matches(self, identifier):
         return False
+
     def defined_by(self):
         """Returns a list of other Fragments with the same name, ie
         which taken together define the whole fragment."""
         return []
+
     def referenced_in(self):
         """Returns a list of CodeElements which reference this
         Fragment."""
         return []
+
     def used_identifiers(self):
         """Returns a list of the identifier definitions made by this
         CodeElement and their users: [[identifier, [element]]]."""
         return []
+
     def uses_identifiers(self):
         """Returns a list of all the identifier definitions made by
         other CodeElements and used in this one:
         [[identifier-text, [element]]]."""
         return []
 
+
 class Text(DocumentElement):
     """Contains LaTeX text from the original nuweb source file."""
     def __init__(self, text):
         self.text = re.sub(r'@@', '@', text)
+
 
 class CodeElement(DocumentElement):
     """May be a File or a Fragment.
@@ -590,7 +608,7 @@ class CodeElement(DocumentElement):
         """Provide a printable representation (only for debugging)."""
         return "%s/%d" % (self.name, self.scrap_number)
 
-    def write_code(self, stream, indent, parameters = []):
+    def write_code(self, stream, indent, parameters=[]):
         """Output the code to 'stream', indenting all lines after the
         first by 'indent', and skipping the last line if it's
         blank."""
@@ -679,14 +697,14 @@ class CodeElement(DocumentElement):
         def invokes_self(code_lines):
             for l in code_lines:
                 if l.invokes(self.name):
-                    return True;
-            return False;
+                    return True
+            return False
         # A Fragment that's referenced but not defined has no code
         # lines, so don't include it.
         return [e for e in document
-                if isinstance(e, CodeElement) \
-                    and hasattr(e, 'lines') \
-                    and invokes_self(e.lines)]
+                if isinstance(e, CodeElement)
+                and hasattr(e, 'lines')
+                and invokes_self(e.lines)]
 
     def used_identifiers(self):
         """Returns a list of the identifier definitions made by this
@@ -723,8 +741,10 @@ class CodeElement(DocumentElement):
     def defines_identifier(self, id):
         """Return True if the Element defines the identifier id."""
         for i in self.identifiers:
-            if id == i[0]: return True
+            if id == i[0]:
+                return True
         return False
+
 
 class File(CodeElement):
     """Forms part of a named file. The whole file is composed of all
@@ -743,7 +763,7 @@ class File(CodeElement):
         self.flags = name_parts[1:]
 
     def generate_code(self):
-        if not self.name in files:
+        if self.name not in files:
             files[self.name] = OutputCodeFile(self.name)
         self.write_code(files[self.name], '')
 
@@ -755,6 +775,7 @@ class File(CodeElement):
         output.write("\\NWtarget{nuweb%s}{}\\verb@\"%s\"@"
                      "\\nobreak\\ {\\footnotesize{%s}}$\\equiv$\n"
                      % (link, self.name, link))
+
 
 class Fragment(CodeElement):
     """Forms part of a definition. The whole definition is composed of
@@ -789,9 +810,9 @@ class Fragment(CodeElement):
         return [d for d in document if d.matches(self.name)]
 
 
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Index class and children
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 class Index(DocumentElement):
     """Outputs an index."""
@@ -801,14 +822,15 @@ class Index(DocumentElement):
         """Creates and returns the appropriate type of Index given the
         'id'."""
         return {
-            'f' : lambda: FileIndex(),
-            'm' : lambda: MacroIndex(),
-            'u' : lambda: IdentifierIndex()
+            'f': lambda: FileIndex(),
+            'm': lambda: MacroIndex(),
+            'u': lambda: IdentifierIndex()
             }[id]()
 
     def generate_latex(self, output):
         """To be overridden."""
         pass
+
 
 class FileIndex(Index):
     """Outputs an index of all the files specified in the document,
@@ -843,6 +865,7 @@ class FileIndex(Index):
 
         sys.stderr.write("generating the file index took %.3gs.\n"
                          % (time.clock() - start))
+
 
 class MacroIndex(Index):
     """Outputs an index of all the fragments in the docment, stating
@@ -889,6 +912,7 @@ class MacroIndex(Index):
         sys.stderr.write("generating the macro index took %.3gs.\n"
                          % (time.clock() - start))
 
+
 class IdentifierIndex(Index):
 
     def generate_latex(self, output):
@@ -915,7 +939,7 @@ class IdentifierIndex(Index):
 
                     value = users.get(identifier, [])
                     for u in uses:
-                        if not u in value:
+                        if u not in value:
                             value.append(u)
                     users[identifier] = value
 
@@ -932,14 +956,14 @@ class IdentifierIndex(Index):
                 output.write("\\item \\verb@%s@" % i)
                 output.write(": {\\NWtxtIdentDefinedIn} {\\footnotesize ")
                 CodeElement.write_elements(output, sorted(definitions[i]))
-                output.write("}, ");
+                output.write("}, ")
                 if len(users[i]) > 0:
-                    output.write("{\\NWtxtIdentUsedIn} {\\footnotesize ");
+                    output.write("{\\NWtxtIdentUsedIn} {\\footnotesize ")
                     CodeElement.write_elements(output, sorted(users[i]))
-                    output.write("}");
+                    output.write("}")
                 else:
                     output.write("{\\NWtxtIdentsNotUsed}")
-                output.write(".\n");
+                output.write(".\n")
 
             output.write("\\end{list}}\n")
 
@@ -947,9 +971,9 @@ class IdentifierIndex(Index):
                          % (time.clock() - start))
 
 
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Main and utilities
-#-----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 def read_nuweb(path):
     """Reads the .w file specified at 'path' (and any other files
@@ -1009,6 +1033,7 @@ def read_nuweb(path):
 
     input.close()
 
+
 def read_aux(path):
     """LaTeX generates <basename>.aux, which contains (inter alia) the
     page on which each \label{} occurs. Nuweb generates a label for
@@ -1029,7 +1054,8 @@ def read_aux(path):
         need_to_rerun = True
         return
 
-    page = -1  # impossible value
+    page = -1            # impossible value
+    scrap_on_page = 'Z'  # very unlikely value
 
     for l in input:
         # Be explicit about the expected format; the memoir
@@ -1059,29 +1085,29 @@ def main():
     generate_document = True
 
     def usage():
-	sys.stderr.write('%s $Revision: 8a3bacdfb376 $\n' % sys.argv[0])
-	sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
-	sys.stderr.write('flags:\n')
-	sys.stderr.write('-h, --help:              '
-			 + 'output this message\n')
-	sys.stderr.write('-r, --hyperlinks:        '
-			 + 'generate hyperlinks\n')
-	sys.stderr.write('-t, --no-tex:            '
-			 + 'don\'t generate the LaTeX output\n')
+        sys.stderr.write('%s $Revision: 7c91ca65c927 $\n' % sys.argv[0])
+        sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
+        sys.stderr.write('flags:\n')
+        sys.stderr.write('-h, --help:              '
+                         + 'output this message\n')
+        sys.stderr.write('-r, --hyperlinks:        '
+                         + 'generate hyperlinks\n')
+        sys.stderr.write('-t, --no-tex:            '
+                         + 'don\'t generate the LaTeX output\n')
 
     try:
-        opts, args = getopt.getopt\
-	    (sys.argv[1:],
-	     "hrt",
-	     ["help", "hyperlinks", "no-tex", ])
+        opts, args = getopt.getopt(
+            sys.argv[1:],
+            "hrt",
+            ["help", "hyperlinks", "no-tex", ])
     except getopt.GetoptError:
         usage()
         sys.exit(1)
 
     for o, v in opts:
-	if o in ("-h", "--help"):
-	    usage()
-	    sys.exit(0)
+        if o in ("-h", "--help"):
+            usage()
+            sys.exit(0)
         elif o in ("-r", "--hyperlinks"):
             hyperlinks = True
         elif o in ("-t", "--no-tex"):
@@ -1121,13 +1147,13 @@ def main():
                     if isinstance(e, Fragment) \
                             and e != d \
                             and e.name[-3:] != '...' \
-                            and e.name[:len(d.name)-3] == d.name[:-3] :
-                        if not e.name in replacement:
+                            and e.name[:len(d.name)-3] == d.name[:-3]:
+                        if e.name not in replacement:
                             replacement.append(e.name)
                 if len(replacement) > 1:
-                    sys.stderr.write\
-                        ("multiple expansions for definition \"%s\".\n"
-                         % d.name)
+                    sys.stderr.write(
+                        "multiple expansions for definition \"%s\".\n"
+                        % d.name)
                     sys.exit(1)
                 elif len(replacement) == 1:
                     d.name = replacement[0]
@@ -1161,8 +1187,8 @@ def main():
         for j, c in enumerate(code):
             if c.scrap_on_page == 'a':
                 # NB short-circuit evaluation
-                if (j + 1 == len(code)
-                    or c.page_number != code[j + 1].page_number):
+                if j + 1 == len(code) \
+                   or c.page_number != code[j + 1].page_number:
                     c.scrap_on_page = ''
     except:
         pass
@@ -1173,28 +1199,28 @@ def main():
         stream.write("\\newcommand{\\%s}{%s}\n" % (macro, definition))
 
     if hyperlinks:
-        doc.write ("%s\n"
-                   % "\\newcommand{\\NWtarget}[2]{\\hypertarget{#1}{#2}}")
-        doc.write ("%s\n" % "\\newcommand{\\NWlink}[2]{\\hyperlink{#1}{#2}}")
+        doc.write("%s\n"
+                  % "\\newcommand{\\NWtarget}[2]{\\hypertarget{#1}{#2}}")
+        doc.write("%s\n" % "\\newcommand{\\NWlink}[2]{\\hyperlink{#1}{#2}}")
     else:
-        doc.write ("%s\n" % "\\newcommand{\\NWtarget}[2]{#2}")
-        doc.write ("%s\n" % "\\newcommand{\\NWlink}[2]{#2}")
+        doc.write("%s\n" % "\\newcommand{\\NWtarget}[2]{#2}")
+        doc.write("%s\n" % "\\newcommand{\\NWlink}[2]{#2}")
 
-    define_macro (doc, "NWtxtMacroDefBy", "Fragment defined by")
-    define_macro (doc, "NWtxtMacroRefIn", "Fragment referenced in")
-    define_macro (doc, "NWtxtMacroNoRef", "Fragment never referenced")
-    define_macro (doc, "NWtxtDefBy", "Defined by")
-    define_macro (doc, "NWtxtRefIn", "Referenced in")
-    define_macro (doc, "NWtxtNoRef", "Not referenced")
-    define_macro (doc, "NWtxtFileDefBy", "File defined by")
-    define_macro (doc, "NWtxtIdentDefinedIn", "defined in")
-    define_macro (doc, "NWtxtIdentUsedIn", "used in")
-    define_macro (doc, "NWtxtIdentsDefed", "Defines:")
-    define_macro (doc, "NWtxtIdentsNotUsed", "never used")
-    define_macro (doc, "NWtxtIdentsUsed", "Uses:")
-    define_macro (doc, "NWsep", "${\\diamond}$")
-    define_macro (doc, "NWnotglobal", "(not defined globally)")
-    define_macro (doc, "NWuseHyperlinks", "")
+    define_macro(doc, "NWtxtMacroDefBy", "Fragment defined by")
+    define_macro(doc, "NWtxtMacroRefIn", "Fragment referenced in")
+    define_macro(doc, "NWtxtMacroNoRef", "Fragment never referenced")
+    define_macro(doc, "NWtxtDefBy", "Defined by")
+    define_macro(doc, "NWtxtRefIn", "Referenced in")
+    define_macro(doc, "NWtxtNoRef", "Not referenced")
+    define_macro(doc, "NWtxtFileDefBy", "File defined by")
+    define_macro(doc, "NWtxtIdentDefinedIn", "defined in")
+    define_macro(doc, "NWtxtIdentUsedIn", "used in")
+    define_macro(doc, "NWtxtIdentsDefed", "Defines:")
+    define_macro(doc, "NWtxtIdentsNotUsed", "never used")
+    define_macro(doc, "NWtxtIdentsUsed", "Uses:")
+    define_macro(doc, "NWsep", "${\\diamond}$")
+    define_macro(doc, "NWnotglobal", "(not defined globally)")
+    define_macro(doc, "NWuseHyperlinks", "")
 
     for d in document:
         d.generate_latex(doc)
