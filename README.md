@@ -3,13 +3,13 @@ fix [bug 2965157][2965157] - if it is indeed a bug!
 
 [2965157]: https://sourceforge.net/tracker/?func=detail&aid=2965157&group_id=7449&atid=107449
 
-Part of this is down to the fact that nuweb is implemented in C, but I think that mostly it's because we developers haven't treated it as a proper Literate Programming project. There ought to be some explanation of why (referring to [bug 2965157][2965157] again) there's a scrap reference inside the parameter list. I think (from discussions on the nuweb-users mailing list) that it was deliberate, but I see no clue as to the intention.
+Part of this is down to the fact that nuweb is implemented in C, but I think that mostly it's because we developers haven't treated it as a proper Literate Programming project. There ought to be some explanation of why (referring to [bug 2965157][2965157] again) there's a scrap reference inside the parameter list. I think (from [discussions on the nuweb-users mailing list](https://sourceforge.net/p/nuweb/mailman/nuweb-users/thread/17420.5508.654059.590404@Grootgrut.hit/)) that it was deliberate, but I see no clue as to the intention.
 
 As another problem (far from the only one!), what is a block comment?
 
 Anyway, to scratch this itch I've been reworking nuweb in Python.
 
-So far, the parts implemented are:
+So far, the parts of implemented (you may like to refer to the [nuweb user guide](http://nuweb.sourceforge.net/nuwebdoc.pdf)) are:
 
 * files (`@o` and `@O`, but no flags)
 * fragments (`@d` and `@D`, but no flags)
