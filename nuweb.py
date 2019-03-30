@@ -59,8 +59,11 @@ need_to_rerun = False
 # Nuweb file i/o
 # ----------------------------------------------------------------------
 
+class Error(Exception):
+    pass
 
-class InputFile(file):
+
+class InputFile:
     """Supports iteration over an input file, eating all occurrences
     of at-percent (but not at-at-percent) from the occurrence's
     position to the newline (or end-of-file).
@@ -72,16 +75,45 @@ class InputFile(file):
     at_percent_matcher = re.compile(r'(?s)(?<!@)@%.*$')
 
     def __init__(self, path, mode='r'):
-        file.__init__(self, path, mode)
+        self.f = open(path, mode)
         self.at_end = False
         self.line_number = 0
         self.path = path
 
+    def close(self):
+        self.f.close()
+
     def readline(self):
-        l = file.readline(self)
+        l = self.f.readline()
         self.at_end = len(l) == 0
         self.line_number = self.line_number + 1
         return re.sub(InputFile.at_percent_matcher, '', l)
+
+
+class PaddingStack:
+    """Maintains a stack of the current padding level."""
+
+    def __init__(self):
+        self.data = ['', ]
+        # For debug
+        self.last = 0
+
+    def top(self):
+        """Returns the current padding."""
+        return self.data[-1];
+
+    def push(self, pad):
+        """pushes the current padding + pad onto the stack."""
+        # For debug: replace each characters in the input pad by the
+        # new padding level.
+        # pad = re.sub(r'.', "%d" % (self.last + 1), pad)
+        self.data.append(self.data[-1] + pad)
+        self.last +=1
+
+    def pop(self):
+        """Pops the current padding."""
+        self.data = self.data[:-1]
+        self.last -= 1
 
 
 class OutputCodeFile:
@@ -100,16 +132,35 @@ class OutputCodeFile:
 
     def __init__(self, path):
         self.path = path
-        self.tempfile = tempfile.TemporaryFile(dir=".", prefix="nw")
+        self.tempfile = tempfile.TemporaryFile(mode="w+", dir=".", prefix="nw")
         self.buffer = ''
+        self.stack = PaddingStack()
+        self.last_line_was_blank = 1 # So we skip any introductory
+                                     # blank lines
+
+    def add_padding(self, padding):
+        self.stack.push(padding)
+
+    def pop_padding(self):
+        self.stack.pop()
 
     def write(self, text):
+        if len(text) == 0:
+            return
+        if text.rstrip() == '':
+            if self.last_line_was_blank:
+                return
+            self.last_line_was_blank = 1
+        else:
+             self.last_line_was_blank = 0
+        if len(self.buffer) == 0:
+            self.buffer = self.stack.top()
         nl = text.find("\n")
         if nl >= 0:
             self.tempfile.write((self.buffer + text[:nl]).rstrip())
             self.tempfile.write("\n")
             self.buffer = ''
-            self.write(text[nl + 1:])
+            self.write(text[nl + 1:])  # recursive call
         else:
             self.buffer = self.buffer + text
 
@@ -223,14 +274,14 @@ class CodeLine():
 
         return str
 
-    def write_code(self, stream, indent, parameters):
-        """Writes self to 'stream' as code, indented by 'indent'. To
-        be overridden."""
-        pass
+    def write_code(self, stream, parameters=[]):
+        """Writes self to 'stream' as code, indented by the current
+        padding. To be overridden."""
+        raise Error();
 
     def write_latex(self, stream):
         """Writes self to 'stream' as LaTeX. To be overridden."""
-        pass
+        raise Error();
 
     def invokes(self, candidate):
         """Returns True if the CodeLine invokes the fragment
@@ -244,20 +295,20 @@ class LiteralCodeLine(CodeLine):
     def __init__(self, line):
         self.text = line
 
-    def write_code(self, stream, indent, parameters):
-        """Writes self to 'stream' as code, indented by 'indent', with
-        substitution of 'parameters'."""
+    def write_code(self, stream, parameters=[]):
+        """Writes self to 'stream' as code, indented by the current padding,
+        with substitution of 'parameters'. """
         # '@#' (at the start of the text) means don't indent.
         text = CodeLine.substitute_parameters(self.text, parameters)
         if re.match(r'@#', text):
             text = text[2:]
-            indent = ""
+            # XXX
         text = CodeLine.substitute_at_symbols_for_code(text)
-        stream.write("%s%s" % (indent, text))
+        stream.write("%s" % (text,))
 
     def write_latex(self, stream):
         """Writes self to 'stream' as LaTeX."""
-        # Remove any trailing '\n' (XXX is this right?)
+        # Remove any trailing '\n'
         text = re.sub(r'\n', '', self.text)
         text = CodeLine.substitute_at_symbols_for_latex(text)
         stream.write("\\mbox{}\\verb@%s@\\\\\n" % text)
@@ -282,19 +333,23 @@ class InvokingCodeLine(CodeLine):
         self.parameters = parameters
         self.end = m.group('end')
 
-    def write_code(self, stream, indent, parameters):
-        """Writes self to 'stream' as code, indented by 'indent'."""
+    def write_code(self, stream, parameters=[]):
+        """Writes self to 'stream' as code, indented by the current
+        indentation."""
         start = CodeLine.substitute_at_symbols_for_code(self.start)
         end = CodeLine.substitute_at_symbols_for_code(self.end)
-        stream.write("%s%s" % (indent, start))
+        # Write the starting text
+        stream.write("%s" % start)
+        # Add padding to correspond (as many spaces as there were in
+        # the start text). Note, since we've just started a line of
+        # output, the new padding's not going to be used until we
+        # start the next line.
+        stream.add_padding(re.sub(r'\S', ' ', start).expandtabs())
         params = [CodeLine.substitute_parameters(p, parameters)
                   for p in self.parameters]
-        # Note the indent needed for the fragments (where we are now;
-        # the input indent was where we began, and we've now added the
-        # characters in the self.start sequence).
-        new_indent = indent + re.sub(r'\S', ' ', start).expandtabs()
         fragments = [d for d in document if d.matches(self.fragment)]
         # Fix up abbreviated names in the invocation.
+        # Abbreviated names in the declaration were fixed up earlier.
         # XXX Fixing up stuff on the fly probably doesn't help the
         # XXX reader's understanding!
         for f in fragments:
@@ -303,15 +358,13 @@ class InvokingCodeLine(CodeLine):
         if len(fragments) == 0:
             sys.stderr.write("no fragments matching '%s'.\n" % self.fragment)
         else:
-            fragments[0].write_code(stream, new_indent, params)
-            for f in fragments[1:]:
-                # For follow-on fragments, we have to output the new
-                # indentation at the beginning of the new line. NB,
-                # this assumes that if there is anything in self.end,
-                # there'll only be ome matching fragment.
-                stream.write(new_indent)
-                f.write_code(stream, new_indent, params)
+            for f in fragments:
+                # This will be the Fragment's inherited
+                # CodeElement.write_code(), which outputs the
+                # Fragment's lines.
+                f.write_code(stream, params)
         stream.write(end)
+        stream.pop_padding()
 
     def write_latex(self, stream):
         """Writes self to 'stream' as LaTeX."""
@@ -578,6 +631,9 @@ class CodeElement(DocumentElement):
 
         self.name = name
 
+        # debug
+        self.text = text
+
         # We want to split into lines, retaining the \n at the end of
         # all lines that have one already (which may not include the
         # last, or only, line).
@@ -608,13 +664,10 @@ class CodeElement(DocumentElement):
         """Provide a printable representation (only for debugging)."""
         return "%s/%d" % (self.name, self.scrap_number)
 
-    def write_code(self, stream, indent, parameters=[]):
-        """Output the code to 'stream', indenting all lines after the
-        first by 'indent', and skipping the last line if it's
-        blank."""
-        self.lines[0].write_code(stream, '', parameters)
-        for l in self.lines[1:]:
-            l.write_code(stream, indent, parameters)
+    def write_code(self, stream, parameters=[]):
+        """Output the code to 'stream'k."""
+        for l in self.lines:
+            l.write_code(stream, parameters)
 
     def generate_latex(self, output):
         output.write("\\begin{flushleft} \\small\n")
@@ -625,9 +678,19 @@ class CodeElement(DocumentElement):
         self.write_title(output)
         output.write("\\vspace{-1ex}\n")
         output.write("\\begin{list}{}{} \\item\n")
-        for l in self.lines:
+        # Strip leading & trailing blank lines
+        lines = self.lines
+        if len(lines) > 0 \
+           and isinstance(lines[0], LiteralCodeLine) \
+           and lines[0].text in ['', '\n']:
+            lines = lines[1:]
+        if len(lines) > 0 \
+           and isinstance(lines[-1], LiteralCodeLine) \
+           and lines[-1].text in ['', '\n']:
+            lines = lines[:-1]
+        for l in lines:
             l.write_latex(output)
-        output.write("\\mbox{}{\NWsep}\n")
+        output.write("\\mbox{}{\\NWsep}\n")
         output.write("\\end{list}\n")
         output.write("\\vspace{-1ex}\n")
         defined_by = self.defined_by()
@@ -1032,6 +1095,13 @@ def read_nuweb(path):
                      % (input.path, input.line_number))
 
     input.close()
+
+    # for debug
+    for d in document:
+        if hasattr(d, 'text'):
+            text = d.text
+        else:
+            text = 'none'
 
 
 def read_aux(path):
