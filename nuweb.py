@@ -712,6 +712,13 @@ class CodeElement(DocumentElement):
             output.write("\\setlength{\\itemindent}{-\\leftmargin}")
             output.write("}\n")
 
+            def write_id_and_users(i):
+                output.write("\\verb@%s@\\ in " % i[0])
+                if len(i[1]) > 0:
+                    CodeElement.write_elements(output, sorted(i[1]))
+                else:
+                    output.write("\\NWtxtIdentsNotUsed")
+
             def write_id_and_uses(i):
                 output.write("\\verb@%s@\\ " % i[0])
                 if len(i[1]) > 0:
@@ -734,11 +741,11 @@ class CodeElement(DocumentElement):
                     output.write("\\item \\NWtxtMacroNoRef.\n")
 
             if len(used_identifiers) > 0:
-                output.write("\\item \\NWtxtIdentsDefed\\ ")
+                output.write("\\item \\NWtxtIdentUsers\\ ")
                 for i in used_identifiers[:-1]:
-                    write_id_and_uses(i)
+                    write_id_and_users(i)
                     output.write(", ")
-                write_id_and_uses(used_identifiers[-1])
+                write_id_and_users(used_identifiers[-1])
                 output.write(".\\\\\n")
 
             if len(uses_identifiers) > 0:
@@ -1285,7 +1292,7 @@ def main():
     define_macro(doc, "NWtxtFileDefBy", "File defined by")
     define_macro(doc, "NWtxtIdentDefinedIn", "defined in")
     define_macro(doc, "NWtxtIdentUsedIn", "used in")
-    define_macro(doc, "NWtxtIdentsDefed", "Defines:")
+    define_macro(doc, "NWtxtIdentUsers", "Users:")
     define_macro(doc, "NWtxtIdentsNotUsed", "never used")
     define_macro(doc, "NWtxtIdentsUsed", "Uses:")
     define_macro(doc, "NWsep", "${\\diamond}$")
