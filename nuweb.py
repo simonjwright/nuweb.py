@@ -363,6 +363,9 @@ class InvokingCodeLine(CodeLine):
                 # CodeElement.write_code(), which outputs the
                 # Fragment's lines.
                 f.write_code(stream, params)
+                # We've eliminated the trailing \n from the last line,
+                # so we need to replace it. XXX THINK ABOUT THIS
+                stream.write('\n')
         stream.write(end)
         stream.pop_padding()
 
@@ -665,8 +668,26 @@ class CodeElement(DocumentElement):
         return "%s/%d" % (self.name, self.scrap_number)
 
     def write_code(self, stream, parameters=[]):
-        """Output the code to 'stream'k."""
-        for l in self.lines:
+        """Output the code to 'stream'."""
+        # Strip leading & trailing blank lines
+        lines = self.lines
+        while len(lines) > 0 \
+           and isinstance(lines[0], LiteralCodeLine) \
+           and lines[0].text in ['', '\n']:
+            lines = lines[1:]
+        while len(lines) > 0 \
+           and isinstance(lines[-1], LiteralCodeLine) \
+           and lines[-1].text in ['', '\n']:
+            lines = lines[:-1]
+        # Strip trailing \n from last line. NB, this means that the
+        # last line of a scrap (if a literal code line) needs an extra
+        # \n; but that means that trailing text after an invocation
+        # will appear on the next line.
+        if len(lines) > 0 \
+           and isinstance(lines[-1], LiteralCodeLine) \
+           and lines[-1].text[-1] == '\n':
+            lines[-1].text = lines[-1].text[:-1]
+        for l in lines:
             l.write_code(stream, parameters)
 
     def generate_latex(self, output):
@@ -680,11 +701,11 @@ class CodeElement(DocumentElement):
         output.write("\\begin{list}{}{} \\item\n")
         # Strip leading & trailing blank lines
         lines = self.lines
-        if len(lines) > 0 \
+        while len(lines) > 0 \
            and isinstance(lines[0], LiteralCodeLine) \
            and lines[0].text in ['', '\n']:
             lines = lines[1:]
-        if len(lines) > 0 \
+        while len(lines) > 0 \
            and isinstance(lines[-1], LiteralCodeLine) \
            and lines[-1].text in ['', '\n']:
             lines = lines[:-1]
@@ -713,8 +734,9 @@ class CodeElement(DocumentElement):
             output.write("}\n")
 
             def write_id_and_users(i):
-                output.write("\\verb@%s@\\ in " % i[0])
+                output.write("\\verb@%s@\\ " % i[0])
                 if len(i[1]) > 0:
+                    output.write("in ")
                     CodeElement.write_elements(output, sorted(i[1]))
                 else:
                     output.write("\\NWtxtIdentsNotUsed")
