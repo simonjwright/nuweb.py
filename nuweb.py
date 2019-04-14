@@ -130,15 +130,24 @@ class OutputCodeFile:
     white space (which, incidentally, includes non-zero-length blank
     lines)."""
 
-    def __init__(self, path):
+    def __init__(self, path, flags):
         self.path = path
         self.tempfile = tempfile.TemporaryFile(mode="w+", dir=".", prefix="nw")
         self.buffer = ''
         self.stack = PaddingStack()
         self.last_line_was_blank = 1 # So we skip any introductory
                                      # blank lines
+        self.expand_tabs = True
+        for flag in flags:
+            if flag == '-t':
+                self.expand_tabs = False
+            else:
+                sys.stderr.write("Output file %s has flag %s, not handled\n"
+                                 % (path, flag))
 
     def add_padding(self, padding):
+        if self.expand_tabs:
+            padding = padding.expandtabs()
         self.stack.push(padding)
 
     def pop_padding(self):
@@ -309,7 +318,7 @@ class LiteralCodeLine(CodeLine):
     def write_latex(self, stream):
         """Writes self to 'stream' as LaTeX."""
         # Remove any trailing '\n'
-        text = re.sub(r'\n', '', self.text)
+        text = re.sub(r'\n', '', self.text).expandtabs()
         text = CodeLine.substitute_at_symbols_for_latex(text)
         stream.write("\\mbox{}\\verb@%s@\\\\\n" % text)
 
@@ -344,7 +353,7 @@ class InvokingCodeLine(CodeLine):
         # the start text). Note, since we've just started a line of
         # output, the new padding's not going to be used until we
         # start the next line.
-        stream.add_padding(re.sub(r'\S', ' ', start).expandtabs())
+        stream.add_padding(re.sub(r'\S', ' ', start))
         params = [CodeLine.substitute_parameters(p, parameters)
                   for p in self.parameters]
         fragments = [d for d in document if d.matches(self.fragment)]
@@ -856,7 +865,7 @@ class File(CodeElement):
 
     def generate_code(self):
         if self.name not in files:
-            files[self.name] = OutputCodeFile(self.name)
+            files[self.name] = OutputCodeFile(self.name, self.flags)
         self.write_code(files[self.name], '')
 
     def write_title(self, output):
