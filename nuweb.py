@@ -135,8 +135,11 @@ class OutputCodeFile:
         self.tempfile = tempfile.TemporaryFile(mode="w+", dir=".", prefix="nw")
         self.buffer = ''
         self.stack = PaddingStack()
-        self.last_line_was_blank = 1 # So we skip any introductory
-                                     # blank lines
+
+        # So we skip any introductory blank lines.
+        self.last_line_was_blank = True
+
+        # Expand tabs unless '-t' given.
         self.expand_tabs = True
         for flag in flags:
             if flag == '-t':
@@ -159,9 +162,9 @@ class OutputCodeFile:
         if text.rstrip() == '':
             if self.last_line_was_blank:
                 return
-            self.last_line_was_blank = 1
+            self.last_line_was_blank = True
         else:
-             self.last_line_was_blank = 0
+             self.last_line_was_blank = False
         if len(self.buffer) == 0:
             self.buffer = self.stack.top()
         nl = text.find("\n")
@@ -707,7 +710,7 @@ class CodeElement(DocumentElement):
                      % self.scrap_number)
         self.write_title(output)
         output.write("\\vspace{-1ex}\n")
-        output.write("\\begin{list}{}{} \\item\n")
+        output.write("\\begin{list}{}{\\setlength{\\leftmargin}{1em}} \\item\n")
         # Strip leading & trailing blank lines
         lines = self.lines
         while len(lines) > 0 \
