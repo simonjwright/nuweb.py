@@ -499,7 +499,10 @@ class DocumentElement():
     """The abstract root of the element classes that make up the
     document. The document is a sequence of Text, Code and Index
     elements."""
+
     def generate_code(self):
+        """The default action is this. Only File objects support this
+        method."""
         pass
 
     def generate_latex(self, output):
@@ -553,7 +556,7 @@ class CodeElement(DocumentElement):
     page boundary in the printed document (otherwise a minipage
     environment is used to prevent splitting)."""
 
-    # Matches a CodeEement for factory(). Take care not to recognise
+    # Matches a CodeElement for factory(). Take care not to recognise
     # '@@|' or terminate early on "@@}" (unusual, but occurs in
     # nuweb.w).
     element_matcher = re.compile(r'(?s)'
@@ -870,6 +873,7 @@ class File(CodeElement):
         if self.name not in files:
             files[self.name] = OutputCodeFile(self.name, self.flags)
         self.write_code(files[self.name], '')
+        files[self.name].write('\n')
 
     def write_title(self, output):
         try:
@@ -1196,7 +1200,7 @@ def main():
     generate_document = True
 
     def usage():
-        sys.stderr.write('%s $Revision: 7c91ca65c927 $\n' % sys.argv[0])
+        sys.stderr.write('%s\n' % sys.argv[0])
         sys.stderr.write('usage: nuweb.py [flags] nuweb-file\n')
         sys.stderr.write('flags:\n')
         sys.stderr.write('-h, --help:              '
