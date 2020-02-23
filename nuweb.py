@@ -18,7 +18,6 @@ import getopt
 import re
 import sys
 import tempfile
-import time
 
 # ----------------------------------------------------------------------
 # Notes
@@ -945,7 +944,6 @@ class FileIndex(Index):
     with the elements that define them."""
 
     def generate_latex(self, output):
-        start = time.clock()
 
         # 'files' is a dictionary keyed by file-name, whose values are
         # lists of the CodeElements which define them.
@@ -971,8 +969,7 @@ class FileIndex(Index):
 
             output.write("\\end{list}}\n")
 
-        sys.stderr.write("generating the file index took %.3gs.\n"
-                         % (time.clock() - start))
+        sys.stderr.write("file index generated.\n");
 
 
 class MacroIndex(Index):
@@ -980,7 +977,6 @@ class MacroIndex(Index):
     where defined and where used."""
 
     def generate_latex(self, output):
-        start = time.clock()
 
         # 'definitions' is a dictionary keyed by fragment-name,
         # whose values are lists of the CodeElements that define them.
@@ -1017,14 +1013,12 @@ class MacroIndex(Index):
 
             output.write("\\end{list}}\n")
 
-        sys.stderr.write("generating the macro index took %.3gs.\n"
-                         % (time.clock() - start))
+        sys.stderr.write("macro index generated.\n")
 
 
 class IdentifierIndex(Index):
 
     def generate_latex(self, output):
-        start = time.clock()
 
         # 'definitions' is a dictionary keyed by identifier-text,
         # whose values are lists of the CodeElements that define them.
@@ -1075,8 +1069,7 @@ class IdentifierIndex(Index):
 
             output.write("\\end{list}}\n")
 
-        sys.stderr.write("generating the identifier index took %.3gs.\n"
-                         % (time.clock() - start))
+        sys.stderr.write("identifier index generated.\n")
 
 
 # ----------------------------------------------------------------------
@@ -1279,20 +1272,15 @@ def main():
     # feature has been omitted. In any case, code generation is much
     # quicker than document generation, so the gain would be minimal.
 
-    start = time.clock()
-
     for d in document:
         d.generate_code()
     for f in files.values():
         f.close()
 
-    sys.stderr.write("generating the code took %.3gs.\n"
-                     % (time.clock() - start))
+    sys.stderr.write("code generated.\n")
 
     if not generate_document:
         return
-
-    start = time.clock()
 
     # We check for CodeElements that are the only ones on their page;
     # if that's the case, we clear scrap_on_page, so that the scrap
@@ -1342,8 +1330,7 @@ def main():
 
     doc.close()
 
-    sys.stderr.write("generating the LaTeX took %.3gs overall.\n"
-                     % (time.clock() - start))
+    sys.stderr.write("LaTeX generated.\n")
 
     if need_to_rerun:
         sys.stderr.write('Need to re-run nuweb.py after running latex.\n')
