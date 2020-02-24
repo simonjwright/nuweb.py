@@ -2,8 +2,9 @@ This project supports language-independent [literate programming](https://en.wik
 
 So far, the parts implemented (you may like to refer to the [nuweb user guide](http://nuweb.sourceforge.net/nuwebdoc.pdf)) are:
 
-* files (`@o` and `@O`, but no flags)
-* fragments (`@d` and `@D`, but no flags)
+* files (`@o` and `@O`)
+  * The flag `-t` is supported (suppress tab expansion within this file)
+* fragments (`@d` and `@D`)
 * scraps (delimited by `@{` `@}` only)
 * user-defined identifiers
 * old-style fragment parameters

@@ -155,7 +155,9 @@ class OutputCodeFile:
     def pop_padding(self):
         self.stack.pop()
 
-    def write(self, text):
+    def write(self, text, at_left_margin=False):
+        """@at_left_margin will be True if this LiteralCodeLine began with
+        @#."""
         if len(text) == 0:
             return
         if text.rstrip() == '':
@@ -164,7 +166,7 @@ class OutputCodeFile:
             self.last_line_was_blank = True
         else:
              self.last_line_was_blank = False
-        if len(self.buffer) == 0:
+        if len(self.buffer) == 0 and not at_left_margin:
             self.buffer = self.stack.top()
         nl = text.find("\n")
         if nl >= 0:
@@ -311,11 +313,13 @@ class LiteralCodeLine(CodeLine):
         with substitution of 'parameters'. """
         # '@#' (at the start of the text) means don't indent.
         text = CodeLine.substitute_parameters(self.text, parameters)
-        if re.match(r'@#', text):
+        if re.match(r'^@#', text):
             text = text[2:]
-            # XXX
+            at_left_margin = True
+        else:
+            at_left_margin = False
         text = CodeLine.substitute_at_symbols_for_code(text)
-        stream.write("%s" % (text,))
+        stream.write("%s" % (text,), at_left_margin)
 
     def write_latex(self, stream):
         """Writes self to 'stream' as LaTeX."""
