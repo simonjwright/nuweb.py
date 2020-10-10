@@ -1170,11 +1170,12 @@ def read_aux(path):
     scrap_on_page = 'Z'  # very unlikely value
 
     for l in input:
-        # Be explicit about the expected format; the memoir
-        # documentclass has a complicated form with nested braces for
-        # the {} section before the page number.
+        # Be explicit about the expected format, which is
+        # \newlabel{scrap<no>}{{}{pageno}}
+        # or, if package hyperref is used,
+        # \newlabel{scrap<no>}{{sectionno}{pageno}{sectionname}{sectionref}{}}
         m = re.match(r'\\newlabel{scrap(?P<scrap>\d+)}{{.*}{(?P<page>\d+)}'
-                     + r'{.*}{.*}{.*}}', l)
+                     + r'({.*}{.*}{.*})?}', l)
         if m:
             scrap = int(m.group('scrap'))
             p = m.group('page')
