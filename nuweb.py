@@ -49,6 +49,10 @@ files = {}
 # be specified in your document).
 hyperlinks = False
 
+# 'listings', if True, means use the listings package for formatting
+# scraps. Use this if you want to have a pretty-printer for your scraps.
+listings = False
+
 # 'need_to_rerun', if True, means we end with a message telling the
 # user they need to re-run nuweb.py after running LaTeX (because of a
 # scrap number mismatch).
@@ -326,7 +330,10 @@ class LiteralCodeLine(CodeLine):
         # Remove any trailing '\n'
         text = re.sub(r'\n', '', self.text).expandtabs()
         text = CodeLine.substitute_at_symbols_for_latex(text)
-        stream.write("\\mbox{}\\verb@%s@\\\\\n" % text)
+        if listings:
+            stream.write("\\mbox{}\\lstinline@%s@\\\\\n" % text)
+        else:
+            stream.write("\\mbox{}\\verb@%s@\\\\\n" % text)
 
 
 class InvokingCodeLine(CodeLine):
@@ -436,7 +443,10 @@ class InvokingCodeLine(CodeLine):
                 re.sub(r'\n', '', self.end))
 
         # Output the line.
-        stream.write("\\mbox{}\\verb@%s@\\\\\n" % line)
+        if listings:
+            stream.write("\\mbox{}\\lstinline@%s@\\\\\n" % line)
+        else:
+            stream.write("\\mbox{}\\verb@%s@\\\\\n" % line)
 
     def invokes(self, candidate):
         """Returns True if the InvokingCodeLine invokes the fragment
@@ -1194,6 +1204,7 @@ def read_aux(path):
 def main():
 
     global hyperlinks
+    global listings
 
     generate_document = True
 
@@ -1203,6 +1214,8 @@ def main():
         sys.stderr.write('flags:\n')
         sys.stderr.write('-h, --help:              '
                          + 'output this message\n')
+        sys.stderr.write('-l, --listings:          '
+                         + 'use the listings package for formatting scraps\n')
         sys.stderr.write('-r, --hyperlinks:        '
                          + 'generate hyperlinks\n')
         sys.stderr.write('-t, --no-tex:            '
@@ -1211,8 +1224,8 @@ def main():
     try:
         opts, args = getopt.getopt(
             sys.argv[1:],
-            "hrt",
-            ["help", "hyperlinks", "no-tex", ])
+            "hlrt",
+            ["help", "listings", "hyperlinks", "no-tex", ])
     except getopt.GetoptError:
         usage()
         sys.exit(1)
@@ -1221,6 +1234,8 @@ def main():
         if o in ("-h", "--help"):
             usage()
             sys.exit(0)
+        elif o in ("-l", "--listings"):
+            listings = True
         elif o in ("-r", "--hyperlinks"):
             hyperlinks = True
         elif o in ("-t", "--no-tex"):
