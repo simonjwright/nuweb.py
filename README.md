@@ -12,6 +12,7 @@ So far, the parts implemented (you may like to refer to the [nuweb user guide](h
 * `@%` (anywhere in the document, not just in scraps)
 * `@#` (put code line at left margin)
 * `@@` handling (this one was tricky, and I may not have caught all the cases)
+* switch `-l` (use the `listings` package), aliased `--listings`
 * switch `-r` (generate hyperlinks), aliased `--hyperlinks`.
 
 Includes Emacs support in `poly-nuweb.el`, a minor mode based
