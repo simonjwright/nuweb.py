@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 #  Copyright (C) Simon Wright <simon@pushface.org>
 
